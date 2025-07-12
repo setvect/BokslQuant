@@ -469,6 +469,22 @@ class ProbabilisticBacktester:
         
         return df_excel
     
+    def _prepare_chart_data_for_excel(self, df: pd.DataFrame) -> pd.DataFrame:
+        """차트데이터용 Excel 변환 (수익률을 소수로 변환)"""
+        df_excel = df.copy()
+        
+        # 수익률 관련 컬럼들을 소수로 변환
+        percentage_columns = []
+        for col in df_excel.columns:
+            if any(keyword in col for keyword in ['수익률', 'CAGR', 'MDD', '승률']):
+                percentage_columns.append(col)
+        
+        for col in percentage_columns:
+            if col in df_excel.columns:
+                df_excel[col] = df_excel[col] / 100  # %를 소수로 변환
+        
+        return df_excel
+    
     def _create_statistics_sheet(self, writer, stats: Dict) -> None:
         """통계 요약 시트 생성"""
         stats_data = []
@@ -518,10 +534,10 @@ class ProbabilisticBacktester:
         
         # 제목
         analysis_data.extend([
-            ['📊 확률 기반 투자 전략 분석 리포트'],
-            ['=' * 50],
+            ['[분석] 확률 기반 투자 전략 분석 리포트'],
+            ['-' * 50],
             [''],
-            ['📈 주요 발견사항'],
+            ['[발견] 주요 발견사항'],
             ['']
         ])
         
@@ -531,8 +547,8 @@ class ProbabilisticBacktester:
         dca_win_rate = basic_stats.get('적립식투자_승률', 0)
         
         analysis_data.extend([
-            [f"• 일시투자가 {ls_win_rate}%의 확률로 적립식투자보다 우수한 성과"],
-            [f"• 적립식투자가 {dca_win_rate}%의 확률로 일시투자보다 우수한 성과"],
+            [f"- 일시투자가 {ls_win_rate}%의 확률로 적립식투자보다 우수한 성과"],
+            [f"- 적립식투자가 {dca_win_rate}%의 확률로 일시투자보다 우수한 성과"],
             ['']
         ])
         
@@ -543,10 +559,10 @@ class ProbabilisticBacktester:
         diff = return_stats.get('평균_수익률차이', 0)
         
         analysis_data.extend([
-            ['📊 평균 수익률 비교'],
-            [f"• 일시투자 평균: {ls_avg}%"],
-            [f"• 적립식투자 평균: {dca_avg}%"],
-            [f"• 차이: {diff}%p"],
+            ['[수익률] 평균 수익률 비교'],
+            [f"- 일시투자 평균: {ls_avg}%"],
+            [f"- 적립식투자 평균: {dca_avg}%"],
+            [f"- 차이: {diff}%p"],
             ['']
         ])
         
@@ -555,9 +571,9 @@ class ProbabilisticBacktester:
         dca_cagr_avg = df['적립식투자_CAGR'].mean()
         
         analysis_data.extend([
-            ['📈 연평균 수익률(CAGR) 비교'],
-            [f"• 일시투자 평균 CAGR: {ls_cagr_avg:.2f}%"],
-            [f"• 적립식투자 평균 CAGR: {dca_cagr_avg:.2f}%"],
+            ['[CAGR] 연평균 수익률 비교'],
+            [f"- 일시투자 평균 CAGR: {ls_cagr_avg:.2f}%"],
+            [f"- 적립식투자 평균 CAGR: {dca_cagr_avg:.2f}%"],
             ['']
         ])
         
@@ -566,9 +582,9 @@ class ProbabilisticBacktester:
         dca_mdd_avg = df['적립식투자_MDD'].mean()
         
         analysis_data.extend([
-            ['📉 최대낙폭(MDD) 비교'],
-            [f"• 일시투자 평균 MDD: {ls_mdd_avg:.2f}%"],
-            [f"• 적립식투자 평균 MDD: {dca_mdd_avg:.2f}%"],
+            ['[위험] 최대낙폭(MDD) 비교'],
+            [f"- 일시투자 평균 MDD: {ls_mdd_avg:.2f}%"],
+            [f"- 적립식투자 평균 MDD: {dca_mdd_avg:.2f}%"],
             ['']
         ])
         
@@ -577,19 +593,19 @@ class ProbabilisticBacktester:
         dca_sharpe_avg = df['적립식투자_샤프지수'].mean()
         
         analysis_data.extend([
-            ['⚖️ 샤프지수 비교'],
-            [f"• 일시투자 평균 샤프지수: {ls_sharpe_avg:.3f}"],
-            [f"• 적립식투자 평균 샤프지수: {dca_sharpe_avg:.3f}"],
+            ['[샤프] 샤프지수 비교'],
+            [f"- 일시투자 평균 샤프지수: {ls_sharpe_avg:.3f}"],
+            [f"- 적립식투자 평균 샤프지수: {dca_sharpe_avg:.3f}"],
             ['']
         ])
         
         # 결론
         better_strategy = "일시투자" if ls_win_rate > 50 else "적립식투자"
         analysis_data.extend([
-            ['🏆 종합 결론'],
-            [f"• 분석 기간 동안 {better_strategy}가 더 우수한 성과를 보임"],
-            [f"• 하지만 시장 상황에 따라 결과가 달라질 수 있음"],
-            [f"• 투자자의 위험 성향과 투자 목표를 고려한 선택 필요"]
+            ['[결론] 종합 결론'],
+            [f"- 분석 기간 동안 {better_strategy}가 더 우수한 성과를 보임"],
+            [f"- 하지만 시장 상황에 따라 결과가 달라질 수 있음"],
+            [f"- 투자자의 위험 성향과 투자 목표를 고려한 선택 필요"]
         ])
         
         # DataFrame으로 변환 후 저장
@@ -602,27 +618,67 @@ class ProbabilisticBacktester:
         df_copy = df.copy()
         df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
         
-        yearly_stats = df_copy.groupby('연도').agg({
-            '일시투자_수익률': 'mean',
-            '적립식투자_수익률': 'mean',
+        # 기본 통계 계산
+        yearly_basic = df_copy.groupby('연도').agg({
+            '시작일': 'count',  # 시나리오 수
+            '일시투자_수익률': ['mean', 'std', 'min', 'max'],
+            '적립식투자_수익률': ['mean', 'std', 'min', 'max'],
             '일시투자_CAGR': 'mean',
             '적립식투자_CAGR': 'mean',
             '일시투자_MDD': 'mean',
             '적립식투자_MDD': 'mean',
             '일시투자_샤프지수': 'mean',
             '적립식투자_샤프지수': 'mean'
-        }).round(2)
+        })
         
-        # 승률 데이터
+        # 컬럼명 정리
+        yearly_basic.columns = [
+            '시나리오수',
+            '일시투자_평균수익률', '일시투자_수익률_표준편차', '일시투자_최저수익률', '일시투자_최고수익률',
+            '적립투자_평균수익률', '적립투자_수익률_표준편차', '적립투자_최저수익률', '적립투자_최고수익률',
+            '일시투자_CAGR', '적립투자_CAGR',
+            '일시투자_MDD', '적립투자_MDD',
+            '일시투자_샤프지수', '적립투자_샤프지수'
+        ]
+        
+        # 승률 계산
         yearly_wins = df_copy.groupby('연도')['승자'].value_counts().unstack(fill_value=0)
         if '일시투자' in yearly_wins.columns and '적립식투자' in yearly_wins.columns:
-            yearly_wins['일시투자_승률'] = (yearly_wins['일시투자'] / (yearly_wins['일시투자'] + yearly_wins['적립식투자']) * 100).round(1)
+            total_scenarios = yearly_wins['일시투자'] + yearly_wins['적립식투자']
+            yearly_wins['일시투자_승률'] = (yearly_wins['일시투자'] / total_scenarios * 100).round(1)
+            yearly_wins['적립투자_승률'] = (yearly_wins['적립식투자'] / total_scenarios * 100).round(1)
+        else:
+            yearly_wins['일시투자_승률'] = 0
+            yearly_wins['적립투자_승률'] = 0
         
-        # 결합
-        chart_data = yearly_stats.join(yearly_wins[['일시투자_승률']], how='left')
+        # 데이터 결합
+        chart_data = yearly_basic.join(yearly_wins[['일시투자_승률', '적립투자_승률']], how='left')
+        
+        # 컬럼 순서 재정렬 (핵심 지표 우선)
+        column_order = [
+            '시나리오수',
+            '일시투자_승률', '적립투자_승률',
+            '일시투자_평균수익률', '적립투자_평균수익률',
+            '일시투자_CAGR', '적립투자_CAGR',
+            '일시투자_MDD', '적립투자_MDD',
+            '일시투자_샤프지수', '적립투자_샤프지수',
+            '일시투자_수익률_표준편차', '적립투자_수익률_표준편차',
+            '일시투자_최고수익률', '일시투자_최저수익률',
+            '적립투자_최고수익률', '적립투자_최저수익률'
+        ]
+        
+        # 존재하는 컬럼만 선택
+        available_columns = [col for col in column_order if col in chart_data.columns]
+        chart_data = chart_data[available_columns]
+        
+        # 소수점 정리
+        chart_data = chart_data.round(2)
+        
+        # Excel용 포맷 변환 (수익률을 소수로)
+        chart_data_excel = self._prepare_chart_data_for_excel(chart_data)
         
         # 저장
-        chart_data.to_excel(writer, sheet_name='차트데이터')
+        chart_data_excel.to_excel(writer, sheet_name='차트데이터')
     
     def _format_excel_file(self, filepath: str) -> None:
         """Excel 파일 서식 적용"""
@@ -785,7 +841,7 @@ class ProbabilisticBacktester:
         # 섹션 제목 찾아서 서식 적용
         for row in ws.iter_rows():
             cell_value = str(row[0].value or '')
-            if any(keyword in cell_value for keyword in ['📈', '📊', '📉', '⚖️', '🏆']):
+            if any(keyword in cell_value for keyword in ['[발견]', '[수익률]', '[CAGR]', '[위험]', '[샤프]', '[결론]']):
                 row[0].font = section_font
                 row[0].alignment = Alignment(horizontal='left', vertical='center')
             else:
@@ -809,33 +865,64 @@ class ProbabilisticBacktester:
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center', vertical='center')
         
-        # 데이터 행 서식 (퍼센트 컬럼들)
-        percentage_columns = ['B', 'C', 'D', 'E', 'F', 'G', 'I']  # 수익률, CAGR, MDD, 승률 컬럼들
+        # 컬럼별 포맷 정의 (새로운 구조에 맞게)
+        column_formats = {}
+        for col_num in range(1, ws.max_column + 1):
+            cell = ws.cell(row=1, column=col_num)
+            header_text = str(cell.value or '')
+            
+            # 연도 컬럼 (첫 번째 컬럼)은 포맷하지 않음
+            if col_num == 1:  # 연도 컬럼
+                column_formats[col_num] = None
+            elif '시나리오수' in header_text:
+                column_formats[col_num] = '#,##0'
+            elif '승률' in header_text:
+                column_formats[col_num] = FORMAT_PERCENTAGE_00
+            elif any(keyword in header_text for keyword in ['수익률', 'CAGR', 'MDD']):
+                column_formats[col_num] = FORMAT_PERCENTAGE_00
+            elif '샤프지수' in header_text:
+                column_formats[col_num] = '#,##0.000'
+            elif '표준편차' in header_text:
+                column_formats[col_num] = FORMAT_PERCENTAGE_00
+            else:
+                column_formats[col_num] = '#,##0.00'
         
+        # 데이터 행에 서식 적용
         for row_num in range(2, ws.max_row + 1):
             for col_num in range(1, ws.max_column + 1):
                 cell = ws.cell(row=row_num, column=col_num)
-                col_letter = cell.column_letter
                 
-                if col_letter in percentage_columns:
-                    cell.number_format = FORMAT_PERCENTAGE_00
-                elif col_letter in ['H']:  # 샤프지수
-                    cell.number_format = '#,##0.000'
+                # 포맷 적용 (연도 컬럼은 제외)
+                if col_num in column_formats and column_formats[col_num] is not None:
+                    cell.number_format = column_formats[col_num]
                 
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+                # 정렬
+                if col_num == 1:  # 연도 컬럼
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                else:
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
         
-        # 컬럼 너비 자동 조정
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max(max_length + 2, 12), 20)
-            ws.column_dimensions[column_letter].width = adjusted_width
+        # 컬럼 너비 설정 (최적화)
+        column_widths = {
+            1: 8,   # 연도
+            2: 12,  # 시나리오수
+            3: 12,  # 일시투자_승률
+            4: 12,  # 적립투자_승률
+            5: 16,  # 일시투자_평균수익률
+            6: 16,  # 적립투자_평균수익률
+            7: 14,  # 일시투자_CAGR
+            8: 14,  # 적립투자_CAGR
+            9: 14,  # 일시투자_MDD
+            10: 14, # 적립투자_MDD
+            11: 16, # 일시투자_샤프지수
+            12: 16, # 적립투자_샤프지수
+        }
+        
+        # 나머지 컬럼들은 기본 너비
+        for col_num in range(1, ws.max_column + 1):
+            width = column_widths.get(col_num, 15)
+            col_letter = ws.cell(row=1, column=col_num).column_letter
+            ws.column_dimensions[col_letter].width = width
         
         # 머릿말 행 고정
         ws.freeze_panes = 'A2'
