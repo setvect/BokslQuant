@@ -406,6 +406,440 @@ class ProbabilisticBacktester:
         
         return filepath
     
+    def export_to_excel(self, output_path: str = "results/") -> str:
+        """결과를 Excel 파일로 내보내기 (다중 시트)"""
+        import os
+        from datetime import datetime
+        
+        if not self.scenarios:
+            raise ValueError("분석된 시나리오가 없습니다.")
+        
+        # 결과 디렉토리 생성
+        os.makedirs(output_path, exist_ok=True)
+        
+        # 파일명 생성
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"확률분석_나스닥_{timestamp}.xlsx"
+        filepath = os.path.join(output_path, filename)
+        
+        # 데이터프레임 생성
+        df = pd.DataFrame([scenario.to_dict() for scenario in self.scenarios])
+        
+        # 통계 데이터 생성
+        stats = self.get_summary_statistics()
+        
+        # Excel Writer 생성
+        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+            # 1. 상세 데이터 시트 (수익률을 소수로 변환)
+            df_excel = self._prepare_data_for_excel(df)
+            df_excel.to_excel(writer, sheet_name='상세데이터', index=False)
+            
+            # 2. 통계 요약 시트
+            self._create_statistics_sheet(writer, stats)
+            
+            # 3. 분석 요약 시트
+            self._create_analysis_sheet(writer, df, stats)
+            
+            # 4. 차트 데이터 시트
+            self._create_chart_data_sheet(writer, df)
+        
+        # 엑셀 파일 서식 적용
+        self._format_excel_file(filepath)
+        
+        return filepath
+    
+    def _prepare_data_for_excel(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Excel용으로 데이터 변환 (수익률을 소수로 변환)"""
+        df_excel = df.copy()
+        
+        # 수익률 컬럼들을 소수로 변환 (Excel에서 %포맷 적용하기 위해)
+        percentage_columns = [
+            '일시투자_수익률',
+            '적립식투자_수익률', 
+            '수익률차이',
+            '일시투자_CAGR',
+            '적립식투자_CAGR',
+            '일시투자_MDD',
+            '적립식투자_MDD'
+        ]
+        
+        for col in percentage_columns:
+            if col in df_excel.columns:
+                df_excel[col] = df_excel[col] / 100  # %를 소수로 변환
+        
+        return df_excel
+    
+    def _create_statistics_sheet(self, writer, stats: Dict) -> None:
+        """통계 요약 시트 생성"""
+        stats_data = []
+        
+        # 기본 통계
+        basic_stats = stats.get('기본_통계', {})
+        stats_data.extend([
+            ['구분', '항목', '값'],
+            ['', '', ''],
+            ['기본 통계', '총 시나리오 수', basic_stats.get('총_시나리오수', 0)],
+            ['', '일시투자 승리', f"{basic_stats.get('일시투자_승리', 0)}회"],
+            ['', '적립식투자 승리', f"{basic_stats.get('적립식투자_승리', 0)}회"],
+            ['', '일시투자 승률', f"{basic_stats.get('일시투자_승률', 0)}%"],
+            ['', '적립식투자 승률', f"{basic_stats.get('적립식투자_승률', 0)}%"],
+            ['', '', '']
+        ])
+        
+        # 수익률 통계
+        return_stats = stats.get('수익률_통계', {})
+        stats_data.extend([
+            ['수익률 통계', '일시투자 평균수익률', f"{return_stats.get('일시투자_평균수익률', 0)}%"],
+            ['', '적립식투자 평균수익률', f"{return_stats.get('적립식투자_평균수익률', 0)}%"],
+            ['', '평균 수익률 차이', f"{return_stats.get('평균_수익률차이', 0)}%p"],
+            ['', '일시투자 표준편차', f"{return_stats.get('일시투자_표준편차', 0)}%"],
+            ['', '적립식투자 표준편차', f"{return_stats.get('적립식투자_표준편차', 0)}%"],
+            ['', '', '']
+        ])
+        
+        # 극값 분석
+        extreme_stats = stats.get('극값_분석', {})
+        stats_data.extend([
+            ['극값 분석', '일시투자 최고수익률', f"{extreme_stats.get('일시투자_최고수익률', 0)}%"],
+            ['', '일시투자 최저수익률', f"{extreme_stats.get('일시투자_최저수익률', 0)}%"],
+            ['', '적립식투자 최고수익률', f"{extreme_stats.get('적립식투자_최고수익률', 0)}%"],
+            ['', '적립식투자 최저수익률', f"{extreme_stats.get('적립식투자_최저수익률', 0)}%"],
+            ['', '최대 수익률 차이', f"{extreme_stats.get('최대_수익률차이', 0)}%p"],
+            ['', '최소 수익률 차이', f"{extreme_stats.get('최소_수익률차이', 0)}%p"]
+        ])
+        
+        # DataFrame으로 변환 후 저장
+        stats_df = pd.DataFrame(stats_data)
+        stats_df.to_excel(writer, sheet_name='통계요약', index=False, header=False)
+    
+    def _create_analysis_sheet(self, writer, df: pd.DataFrame, stats: Dict) -> None:
+        """분석 요약 시트 생성"""
+        analysis_data = []
+        
+        # 제목
+        analysis_data.extend([
+            ['📊 확률 기반 투자 전략 분석 리포트'],
+            ['=' * 50],
+            [''],
+            ['📈 주요 발견사항'],
+            ['']
+        ])
+        
+        # 승률 분석
+        basic_stats = stats.get('기본_통계', {})
+        ls_win_rate = basic_stats.get('일시투자_승률', 0)
+        dca_win_rate = basic_stats.get('적립식투자_승률', 0)
+        
+        analysis_data.extend([
+            [f"• 일시투자가 {ls_win_rate}%의 확률로 적립식투자보다 우수한 성과"],
+            [f"• 적립식투자가 {dca_win_rate}%의 확률로 일시투자보다 우수한 성과"],
+            ['']
+        ])
+        
+        # 수익률 분석
+        return_stats = stats.get('수익률_통계', {})
+        ls_avg = return_stats.get('일시투자_평균수익률', 0)
+        dca_avg = return_stats.get('적립식투자_평균수익률', 0)
+        diff = return_stats.get('평균_수익률차이', 0)
+        
+        analysis_data.extend([
+            ['📊 평균 수익률 비교'],
+            [f"• 일시투자 평균: {ls_avg}%"],
+            [f"• 적립식투자 평균: {dca_avg}%"],
+            [f"• 차이: {diff}%p"],
+            ['']
+        ])
+        
+        # CAGR 분석
+        ls_cagr_avg = df['일시투자_CAGR'].mean()
+        dca_cagr_avg = df['적립식투자_CAGR'].mean()
+        
+        analysis_data.extend([
+            ['📈 연평균 수익률(CAGR) 비교'],
+            [f"• 일시투자 평균 CAGR: {ls_cagr_avg:.2f}%"],
+            [f"• 적립식투자 평균 CAGR: {dca_cagr_avg:.2f}%"],
+            ['']
+        ])
+        
+        # MDD 분석
+        ls_mdd_avg = df['일시투자_MDD'].mean()
+        dca_mdd_avg = df['적립식투자_MDD'].mean()
+        
+        analysis_data.extend([
+            ['📉 최대낙폭(MDD) 비교'],
+            [f"• 일시투자 평균 MDD: {ls_mdd_avg:.2f}%"],
+            [f"• 적립식투자 평균 MDD: {dca_mdd_avg:.2f}%"],
+            ['']
+        ])
+        
+        # 샤프지수 분석
+        ls_sharpe_avg = df['일시투자_샤프지수'].mean()
+        dca_sharpe_avg = df['적립식투자_샤프지수'].mean()
+        
+        analysis_data.extend([
+            ['⚖️ 샤프지수 비교'],
+            [f"• 일시투자 평균 샤프지수: {ls_sharpe_avg:.3f}"],
+            [f"• 적립식투자 평균 샤프지수: {dca_sharpe_avg:.3f}"],
+            ['']
+        ])
+        
+        # 결론
+        better_strategy = "일시투자" if ls_win_rate > 50 else "적립식투자"
+        analysis_data.extend([
+            ['🏆 종합 결론'],
+            [f"• 분석 기간 동안 {better_strategy}가 더 우수한 성과를 보임"],
+            [f"• 하지만 시장 상황에 따라 결과가 달라질 수 있음"],
+            [f"• 투자자의 위험 성향과 투자 목표를 고려한 선택 필요"]
+        ])
+        
+        # DataFrame으로 변환 후 저장
+        analysis_df = pd.DataFrame(analysis_data)
+        analysis_df.to_excel(writer, sheet_name='분석요약', index=False, header=False)
+    
+    def _create_chart_data_sheet(self, writer, df: pd.DataFrame) -> None:
+        """차트용 데이터 시트 생성"""
+        # 연도별 집계
+        df_copy = df.copy()
+        df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
+        
+        yearly_stats = df_copy.groupby('연도').agg({
+            '일시투자_수익률': 'mean',
+            '적립식투자_수익률': 'mean',
+            '일시투자_CAGR': 'mean',
+            '적립식투자_CAGR': 'mean',
+            '일시투자_MDD': 'mean',
+            '적립식투자_MDD': 'mean',
+            '일시투자_샤프지수': 'mean',
+            '적립식투자_샤프지수': 'mean'
+        }).round(2)
+        
+        # 승률 데이터
+        yearly_wins = df_copy.groupby('연도')['승자'].value_counts().unstack(fill_value=0)
+        if '일시투자' in yearly_wins.columns and '적립식투자' in yearly_wins.columns:
+            yearly_wins['일시투자_승률'] = (yearly_wins['일시투자'] / (yearly_wins['일시투자'] + yearly_wins['적립식투자']) * 100).round(1)
+        
+        # 결합
+        chart_data = yearly_stats.join(yearly_wins[['일시투자_승률']], how='left')
+        
+        # 저장
+        chart_data.to_excel(writer, sheet_name='차트데이터')
+    
+    def _format_excel_file(self, filepath: str) -> None:
+        """Excel 파일 서식 적용"""
+        try:
+            from openpyxl import load_workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, NamedStyle
+            from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00, FORMAT_NUMBER_COMMA_SEPARATED1
+            
+            wb = load_workbook(filepath)
+            
+            # 상세데이터 시트 서식
+            if '상세데이터' in wb.sheetnames:
+                self._format_detail_sheet(wb['상세데이터'])
+            
+            # 통계요약 시트 서식
+            if '통계요약' in wb.sheetnames:
+                self._format_statistics_sheet(wb['통계요약'])
+            
+            # 분석요약 시트 서식
+            if '분석요약' in wb.sheetnames:
+                self._format_analysis_sheet(wb['분석요약'])
+            
+            # 차트데이터 시트 서식
+            if '차트데이터' in wb.sheetnames:
+                self._format_chart_data_sheet(wb['차트데이터'])
+            
+            wb.save(filepath)
+            
+        except Exception as e:
+            print(f"⚠️ Excel 서식 적용 중 오류: {e}")
+            # 서식 적용 실패해도 파일은 저장됨
+    
+    def _format_detail_sheet(self, ws) -> None:
+        """상세데이터 시트 서식 적용"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00, FORMAT_NUMBER_COMMA_SEPARATED1
+        
+        # 헤더 스타일
+        header_font = Font(bold=True, color='FFFFFF', size=11)
+        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 헤더 행 서식 적용
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # 머릿말 행 고정
+        ws.freeze_panes = 'A2'
+        
+        # 컬럼별 데이터 타입에 맞는 서식 적용
+        column_formats = {
+            'A': None,  # 시작일 (날짜)
+            'B': None,  # 측정일 (날짜)
+            'C': FORMAT_PERCENTAGE_00,  # 일시투자_수익률
+            'D': FORMAT_PERCENTAGE_00,  # 적립식투자_수익률
+            'E': FORMAT_NUMBER_COMMA_SEPARATED1,  # 일시투자_최종가치
+            'F': FORMAT_NUMBER_COMMA_SEPARATED1,  # 적립식투자_최종가치
+            'G': None,  # 승자
+            'H': FORMAT_PERCENTAGE_00,  # 수익률차이
+            'I': FORMAT_PERCENTAGE_00,  # 일시투자_CAGR
+            'J': FORMAT_PERCENTAGE_00,  # 적립식투자_CAGR
+            'K': FORMAT_PERCENTAGE_00,  # 일시투자_MDD
+            'L': FORMAT_PERCENTAGE_00,  # 적립식투자_MDD
+            'M': '#,##0.000',  # 일시투자_샤프지수
+            'N': '#,##0.000',  # 적립식투자_샤프지수
+            'O': FORMAT_NUMBER_COMMA_SEPARATED1,  # 적립식_평단가
+            'P': '#,##0.00',  # 적립식_총구매수량
+            'Q': FORMAT_NUMBER_COMMA_SEPARATED1,  # 시작일_지수가격
+            'R': FORMAT_NUMBER_COMMA_SEPARATED1,  # 측정일_지수가격
+        }
+        
+        # 데이터 행에 서식 적용
+        for row_num in range(2, ws.max_row + 1):
+            for col_letter, number_format in column_formats.items():
+                if number_format:
+                    cell = ws[f'{col_letter}{row_num}']
+                    cell.number_format = number_format
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
+                else:
+                    cell = ws[f'{col_letter}{row_num}']
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 컬럼 너비 자동 조정 (개선된 로직)
+        column_widths = {
+            'A': 12,  # 시작일
+            'B': 12,  # 측정일
+            'C': 14,  # 일시투자_수익률
+            'D': 14,  # 적립식투자_수익률
+            'E': 16,  # 일시투자_최종가치
+            'F': 16,  # 적립식투자_최종가치
+            'G': 10,  # 승자
+            'H': 12,  # 수익률차이
+            'I': 14,  # 일시투자_CAGR
+            'J': 14,  # 적립식투자_CAGR
+            'K': 14,  # 일시투자_MDD
+            'L': 14,  # 적립식투자_MDD
+            'M': 16,  # 일시투자_샤프지수
+            'N': 16,  # 적립식투자_샤프지수
+            'O': 14,  # 적립식_평단가
+            'P': 16,  # 적립식_총구매수량
+            'Q': 16,  # 시작일_지수가격
+            'R': 16,  # 측정일_지수가격
+        }
+        
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
+    
+    def _format_statistics_sheet(self, ws) -> None:
+        """통계요약 시트 서식 적용"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        # 제목 헤더 스타일
+        title_font = Font(bold=True, size=12, color='FFFFFF')
+        title_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        
+        # 구분 헤더 스타일
+        category_font = Font(bold=True, size=11)
+        category_fill = PatternFill(start_color='D9E2F3', end_color='D9E2F3', fill_type='solid')
+        
+        # 첫 번째 행 (헤더) 서식
+        for cell in ws[1]:
+            cell.font = title_font
+            cell.fill = title_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 구분별 서식 적용
+        for row in ws.iter_rows():
+            if row[0].value in ['기본 통계', '수익률 통계', '극값 분석']:
+                for cell in row:
+                    cell.font = category_font
+                    cell.fill = category_fill
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+            else:
+                for cell in row:
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+        
+        # 컬럼 너비 조정
+        ws.column_dimensions['A'].width = 15  # 구분
+        ws.column_dimensions['B'].width = 25  # 항목
+        ws.column_dimensions['C'].width = 15  # 값
+        
+        # 머릿말 행 고정
+        ws.freeze_panes = 'A2'
+    
+    def _format_analysis_sheet(self, ws) -> None:
+        """분석요약 시트 서식 적용"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        # 제목 스타일
+        title_font = Font(bold=True, size=14, color='366092')
+        section_font = Font(bold=True, size=12, color='366092')
+        
+        # 첫 번째 행 (제목) 서식
+        if ws['A1'].value:
+            ws['A1'].font = title_font
+            ws['A1'].alignment = Alignment(horizontal='left', vertical='center')
+        
+        # 섹션 제목 찾아서 서식 적용
+        for row in ws.iter_rows():
+            cell_value = str(row[0].value or '')
+            if any(keyword in cell_value for keyword in ['📈', '📊', '📉', '⚖️', '🏆']):
+                row[0].font = section_font
+                row[0].alignment = Alignment(horizontal='left', vertical='center')
+            else:
+                row[0].alignment = Alignment(horizontal='left', vertical='center')
+        
+        # 컬럼 너비 조정
+        ws.column_dimensions['A'].width = 80
+    
+    def _format_chart_data_sheet(self, ws) -> None:
+        """차트데이터 시트 서식 적용"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00, FORMAT_NUMBER_COMMA_SEPARATED1
+        
+        # 헤더 스타일
+        header_font = Font(bold=True, color='FFFFFF', size=11)
+        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        
+        # 헤더 행 서식
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 데이터 행 서식 (퍼센트 컬럼들)
+        percentage_columns = ['B', 'C', 'D', 'E', 'F', 'G', 'I']  # 수익률, CAGR, MDD, 승률 컬럼들
+        
+        for row_num in range(2, ws.max_row + 1):
+            for col_num in range(1, ws.max_column + 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                col_letter = cell.column_letter
+                
+                if col_letter in percentage_columns:
+                    cell.number_format = FORMAT_PERCENTAGE_00
+                elif col_letter in ['H']:  # 샤프지수
+                    cell.number_format = '#,##0.000'
+                
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 컬럼 너비 자동 조정
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max(max_length + 2, 12), 20)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 머릿말 행 고정
+        ws.freeze_panes = 'A2'
+    
     def get_scenarios_data(self) -> List[Dict]:
         """시나리오 데이터 리스트 반환"""
         return [scenario.to_dict() for scenario in self.scenarios]

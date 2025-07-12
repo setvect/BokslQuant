@@ -105,6 +105,10 @@ def main():
         csv_path = analyzer.export_results()
         print(f"✅ CSV 저장: {csv_path}")
         
+        # Excel 저장
+        excel_path = analyzer.export_to_excel()
+        print(f"✅ Excel 저장: {excel_path}")
+        
         # 통계 JSON 저장
         stats_path = save_statistics_json(stats)
         print(f"✅ 통계 저장: {stats_path}")
@@ -142,7 +146,8 @@ def main():
     print(f"\n" + "="*70)
     print(f"🎉 확률 기반 분석 완료!")
     print(f"📁 생성된 파일들:")
-    print(f"   - 상세 데이터: {csv_path}")
+    print(f"   - 상세 데이터 (CSV): {csv_path}")
+    print(f"   - 상세 데이터 (Excel): {excel_path}")
     print(f"   - 통계 요약: {stats_path}")
     print(f"   - 종합 분석: {chart1_path}")
     print(f"   - 시계열 분석: {chart2_path}")
