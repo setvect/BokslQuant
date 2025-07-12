@@ -119,9 +119,12 @@ dmypy.json
 *.xls
 data/raw/
 data/processed/
+results/
 
 # Plot files
 *.png
 *.jpg
 *.svg
 plots/ 
+
+temp
