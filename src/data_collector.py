@@ -28,18 +28,18 @@ from pathlib import Path
 class IndexDataCollector:
     """주식 지수 데이터 수집기"""
     
-    # 지원하는 지수 목록
+    # 지원하는 지수 목록 (예상 시작일 포함)
     SUPPORTED_INDICES = {
-        'NASDAQ': '^IXIC',      # 나스닥 종합지수
-        'SP500': '^GSPC',       # S&P 500
-        'DOW': '^DJI',          # 다우존스
-        'KOSPI': '^KS11',       # 코스피
-        'KOSDAQ': '^KQ11',      # 코스닥
-        'NIKKEI': '^N225',      # 니케이 225
-        'FTSE': '^FTSE',        # FTSE 100
-        'DAX': '^GDAXI',        # DAX
-        'CAC': '^FCHI',         # CAC 40
-        'HSI': '^HSI',          # 항셍지수
+        'NASDAQ': {'symbol': '^IXIC', 'expected_start': '1971-02-05'},      # 나스닥 종합지수
+        'SP500': {'symbol': '^GSPC', 'expected_start': '1957-03-04'},       # S&P 500 (실제 500개 기업 시작)
+        'DOW': {'symbol': '^DJI', 'expected_start': '1896-05-26'},          # 다우존스
+        'KOSPI': {'symbol': '^KS11', 'expected_start': '1980-01-04'},       # 코스피 ⚠️ 데이터 누락
+        'KOSDAQ': {'symbol': '^KQ11', 'expected_start': '1996-07-01'},      # 코스닥
+        'NIKKEI': {'symbol': '^N225', 'expected_start': '1950-09-07'},      # 니케이 225
+        'FTSE': {'symbol': '^FTSE', 'expected_start': '1984-01-03'},        # FTSE 100
+        'DAX': {'symbol': '^GDAXI', 'expected_start': '1959-12-31'},        # DAX
+        'CAC': {'symbol': '^FCHI', 'expected_start': '1987-12-31'},         # CAC 40
+        'HSI': {'symbol': '^HSI', 'expected_start': '1964-07-31'},          # 항셍지수
     }
     
     def __init__(self, data_dir: str = "data"):
@@ -54,7 +54,7 @@ class IndexDataCollector:
         self.cache_dir = self.data_dir / "cache"
         self.cache_dir.mkdir(exist_ok=True)
         
-    def get_available_indices(self) -> Dict[str, str]:
+    def get_available_indices(self) -> Dict[str, dict]:
         """사용 가능한 지수 목록 반환"""
         return self.SUPPORTED_INDICES.copy()
     
@@ -85,7 +85,8 @@ class IndexDataCollector:
             print(f"Error: Unsupported index '{index_name}'")
             return None
             
-        symbol = self.SUPPORTED_INDICES[index_name]
+        symbol = self.SUPPORTED_INDICES[index_name]['symbol']
+        expected_start = pd.to_datetime(self.SUPPORTED_INDICES[index_name]['expected_start'])
         
         try:
             print(f"Collecting data for {index_name} ({symbol})...")
@@ -97,13 +98,36 @@ class IndexDataCollector:
             if data.empty:
                 print(f"Warning: No data found for {index_name}")
                 return None
+            
+            # S&P 500의 경우 1957년 이후 데이터만 필터링
+            if index_name == 'SP500':
+                original_count = len(data)
+                # 타임존을 고려한 필터링
+                if data.index.tz is not None:
+                    expected_start = expected_start.tz_localize(data.index.tz)
+                data = data[data.index >= expected_start]
+                filtered_count = len(data)
+                print(f"  📅 S&P 500: 1957년 이후 데이터로 필터링 ({original_count} → {filtered_count} days)")
                 
             # 컬럼명 정리
             data.index.name = 'Date'
             data = data.round(2)  # 소수점 2자리로 반올림
             
+            # 데이터 완성도 검증
+            expected_start = pd.to_datetime(self.SUPPORTED_INDICES[index_name]['expected_start']).date()
+            actual_start = data.index[0].date()
+            actual_end = data.index[-1].date()
+            
             print(f"✓ {index_name}: {len(data)} days of data collected")
-            print(f"  Period: {data.index[0].date()} to {data.index[-1].date()}")
+            print(f"  Period: {actual_start} to {actual_end}")
+            
+            # 누락 데이터 경고
+            if actual_start > expected_start:
+                missing_days = (actual_start - expected_start).days
+                missing_years = round(missing_days / 365.25, 1)
+                print(f"  ⚠️  Warning: {missing_years} years of data missing from expected start ({expected_start})")
+                if index_name in ['KOSPI', 'KOSDAQ']:
+                    print(f"     💡 Tip: Use 'python src/korea_data_collector.py --indices {index_name}' for better Korea data")
             
             return data
             
@@ -178,17 +202,28 @@ class IndexDataCollector:
         """저장된 데이터 파일들의 요약 정보 반환"""
         summary_data = []
         
-        for index_name in self.SUPPORTED_INDICES.keys():
+        for index_name, info in self.SUPPORTED_INDICES.items():
             filepath = self.data_dir / f"{index_name}_data.csv"
             if filepath.exists():
                 try:
                     data = pd.read_csv(filepath, index_col=0, parse_dates=True)
+                    expected_start = pd.to_datetime(info['expected_start']).date()
+                    actual_start = data.index.min().date()
+                    
+                    # 누락 연수 계산
+                    missing_years = 0
+                    if actual_start > expected_start:
+                        missing_days = (actual_start - expected_start).days
+                        missing_years = round(missing_days / 365.25, 1)
+                    
                     summary_data.append({
                         'Index': index_name,
-                        'Symbol': self.SUPPORTED_INDICES[index_name],
+                        'Symbol': info['symbol'],
                         'Records': len(data),
-                        'Start_Date': data.index.min().date(),
+                        'Start_Date': actual_start,
                         'End_Date': data.index.max().date(),
+                        'Expected_Start': expected_start,
+                        'Missing_Years': missing_years,
                         'File_Size_MB': round(filepath.stat().st_size / 1024 / 1024, 2)
                     })
                 except Exception as e:
@@ -249,9 +284,10 @@ def main():
     # 지원하는 지수 목록 출력
     if args.list:
         print("지원하는 주식 지수:")
-        print("=" * 40)
-        for name, symbol in collector.get_available_indices().items():
-            print(f"  {name:<10} : {symbol}")
+        print("=" * 60)
+        for name, info in collector.get_available_indices().items():
+            missing_note = " ⚠️ 데이터 누락" if name in ['KOSPI', 'KOSDAQ'] else ""
+            print(f"  {name:<10} : {info['symbol']} (예상시작: {info['expected_start']}){missing_note}")
         return
     
     # 저장된 데이터 요약 출력
