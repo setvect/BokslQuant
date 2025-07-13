@@ -10,8 +10,6 @@ from src.strategies.probabilistic_analysis import ProbabilisticBacktester, Scena
 from src.backtesting.engine import InvestmentBacktester
 from src.visualization.probabilistic_charts import ProbabilisticVisualizer
 import pandas as pd
-import json
-from datetime import datetime
 
 
 def main():
@@ -101,17 +99,9 @@ def main():
     # 5. 결과 저장
     print(f"\n💾 결과 저장 중...")
     try:
-        # CSV 저장
-        csv_path = analyzer.export_results()
-        print(f"✅ CSV 저장: {csv_path}")
-        
         # Excel 저장
         excel_path = analyzer.export_to_excel()
         print(f"✅ Excel 저장: {excel_path}")
-        
-        # 통계 JSON 저장
-        stats_path = save_statistics_json(stats)
-        print(f"✅ 통계 저장: {stats_path}")
         
     except Exception as e:
         print(f"❌ 결과 저장 중 오류: {e}")
@@ -121,21 +111,21 @@ def main():
     try:
         visualizer = ProbabilisticVisualizer()
         
-        # 종합 분석 차트
-        chart1_path = visualizer.plot_probability_analysis(scenarios_data, stats)
-        print(f"✅ 종합 분석 차트: {chart1_path}")
+        # 시작일별 CAGR 막대 차트
+        chart1_path = visualizer.plot_cagr_by_start_date(scenarios_data)
+        print(f"✅ 시작일별 CAGR 차트: {chart1_path}")
         
-        # 시계열 분석 차트
-        chart2_path = visualizer.plot_time_series_analysis(scenarios_data)
-        print(f"✅ 시계열 분석 차트: {chart2_path}")
+        # 시작일별 수익률 막대 차트
+        chart2_path = visualizer.plot_returns_by_start_date(scenarios_data)
+        print(f"✅ 시작일별 수익률 차트: {chart2_path}")
         
-        # 위험-수익률 분석 차트
-        chart3_path = visualizer.plot_risk_return_analysis(scenarios_data)
-        print(f"✅ 위험-수익률 분석 차트: {chart3_path}")
+        # 시작일별 MDD 막대 차트
+        chart3_path = visualizer.plot_mdd_by_start_date(scenarios_data)
+        print(f"✅ 시작일별 MDD 차트: {chart3_path}")
         
-        # 요약 리포트 차트
-        chart4_path = visualizer.plot_summary_report(stats)
-        print(f"✅ 요약 리포트 차트: {chart4_path}")
+        # 시작일별 샤프지수 막대 차트
+        chart4_path = visualizer.plot_sharpe_by_start_date(scenarios_data)
+        print(f"✅ 시작일별 샤프지수 차트: {chart4_path}")
         
     except Exception as e:
         print(f"❌ 시각화 생성 중 오류: {e}")
@@ -146,13 +136,11 @@ def main():
     print(f"\n" + "="*70)
     print(f"🎉 확률 기반 분석 완료!")
     print(f"📁 생성된 파일들:")
-    print(f"   - 상세 데이터 (CSV): {csv_path}")
     print(f"   - 상세 데이터 (Excel): {excel_path}")
-    print(f"   - 통계 요약: {stats_path}")
-    print(f"   - 종합 분석: {chart1_path}")
-    print(f"   - 시계열 분석: {chart2_path}")
-    print(f"   - 위험-수익률 분석: {chart3_path}")
-    print(f"   - 요약 리포트: {chart4_path}")
+    print(f"   - 시작일별 CAGR 차트: {chart1_path}")
+    print(f"   - 시작일별 수익률 차트: {chart2_path}")
+    print(f"   - 시작일별 MDD 차트: {chart3_path}")
+    print(f"   - 시작일별 샤프지수 차트: {chart4_path}")
     print(f"="*70)
 
 
@@ -191,25 +179,6 @@ def print_summary_statistics(stats: dict):
     else:
         print(f"\n🏁 결론: 적립식투자가 {basic['적립식투자_승률']:.1f}%의 확률로 더 우수한 성과를 보임")
 
-
-def save_statistics_json(stats: dict) -> str:
-    """통계를 JSON 파일로 저장"""
-    import os
-    from datetime import datetime
-    
-    # 결과 디렉토리 생성
-    os.makedirs("results", exist_ok=True)
-    
-    # 파일명 생성
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"확률분석_통계_{timestamp}.json"
-    filepath = os.path.join("results", filename)
-    
-    # JSON 저장
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(stats, f, ensure_ascii=False, indent=2)
-    
-    return filepath
 
 
 def quick_analysis():

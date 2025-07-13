@@ -56,414 +56,515 @@ class ProbabilisticVisualizer:
         
         plt.rcParams['axes.unicode_minus'] = False
     
-    def plot_probability_analysis(self, scenarios_data: List[Dict], 
-                                stats: Dict,
-                                save_path: Optional[str] = None) -> str:
-        """확률 분석 종합 차트"""
-        fig = plt.figure(figsize=self.figsize)
+    def plot_cagr_by_start_date(self, scenarios_data: List[Dict], 
+                               save_path: Optional[str] = None) -> str:
+        """시작일별 CAGR 막대 차트 (시나리오별 + 연도별)"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
         
-        # 데이터 준비
-        df = pd.DataFrame(scenarios_data)
-        lump_sum_returns = df['일시투자_수익률'].values
-        dca_returns = df['적립식투자_수익률'].values
-        return_diff = df['수익률차이'].values
-        
-        # 서브플롯 생성 (2x3 그리드)
-        gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
-        
-        # 1. 확률 분포 히스토그램
-        ax1 = fig.add_subplot(gs[0, 0])
-        ax1.hist(lump_sum_returns, bins=50, alpha=0.7, label='일시투자', 
-                color='#2E86AB', density=True)
-        ax1.hist(dca_returns, bins=50, alpha=0.7, label='적립식투자', 
-                color='#F24236', density=True)
-        ax1.set_title('수익률 확률 분포')
-        ax1.set_xlabel('수익률 (%)')
-        ax1.set_ylabel('밀도')
-        ax1.legend()
-        ax1.grid(True, alpha=0.3)
-        
-        # 2. 승률 파이 차트
-        ax2 = fig.add_subplot(gs[0, 1])
-        win_counts = [stats['기본_통계']['일시투자_승리'], stats['기본_통계']['적립식투자_승리']]
-        labels = ['일시투자', '적립식투자']
-        colors = ['#2E86AB', '#F24236']
-        wedges, texts, autotexts = ax2.pie(win_counts, labels=labels, colors=colors, 
-                                          autopct='%1.1f%%', startangle=90)
-        ax2.set_title(f'승률 비교\n(총 {stats["기본_통계"]["총_시나리오수"]}개 시나리오)')
-        
-        # 3. 수익률 차이 분포
-        ax3 = fig.add_subplot(gs[1, 0])
-        ax3.hist(return_diff, bins=50, alpha=0.7, color='purple', edgecolor='black')
-        ax3.axvline(x=0, color='red', linestyle='--', linewidth=2, label='동일 수익률')
-        ax3.set_title('수익률 차이 분포\n(일시투자 - 적립식투자)')
-        ax3.set_xlabel('수익률 차이 (%p)')
-        ax3.set_ylabel('빈도')
-        ax3.legend()
-        ax3.grid(True, alpha=0.3)
-        
-        # 4. 산점도 (일시투자 vs 적립식투자)
-        ax4 = fig.add_subplot(gs[1, 1])
-        scatter = ax4.scatter(lump_sum_returns, dca_returns, 
-                             alpha=0.6, c=return_diff, cmap='RdYlBu', s=30)
-        ax4.plot([min(lump_sum_returns), max(lump_sum_returns)], 
-                [min(lump_sum_returns), max(lump_sum_returns)], 
-                'r--', alpha=0.8, label='동일 수익률선')
-        ax4.set_xlabel('일시투자 수익률 (%)')
-        ax4.set_ylabel('적립식투자 수익률 (%)')
-        ax4.set_title('투자 전략별 수익률 비교')
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
-        
-        # 컬러바 추가
-        cbar = plt.colorbar(scatter, ax=ax4)
-        cbar.set_label('수익률 차이 (%p)')
-        
-        # 5. 연도별 승률 추이
-        ax5 = fig.add_subplot(gs[2, :])
-        df['시작연도'] = pd.to_datetime(df['시작일']).dt.year
-        yearly_stats = df.groupby('시작연도').agg({
-            '승자': lambda x: (x == '일시투자').mean() * 100
-        }).rename(columns={'승자': '일시투자_승률'})
-        
-        ax5.plot(yearly_stats.index, yearly_stats['일시투자_승률'], 
-                marker='o', linewidth=2, markersize=4, color='#2E86AB')
-        ax5.axhline(y=50, color='red', linestyle='--', alpha=0.7, label='50% 기준선')
-        ax5.set_xlabel('투자 시작 연도')
-        ax5.set_ylabel('일시투자 승률 (%)')
-        ax5.set_title('연도별 일시투자 승률 추이')
-        ax5.legend()
-        ax5.grid(True, alpha=0.3)
-        ax5.set_ylim(0, 100)
-        
-        plt.suptitle('나스닥 확률 기반 투자 전략 분석 (1972-2015)', 
-                    fontsize=16, fontweight='bold')
-        
-        # 저장
-        if save_path is None:
-            save_path = f"results/charts/확률분석_종합_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        return save_path
-    
-    def plot_time_series_analysis(self, scenarios_data: List[Dict],
-                                 save_path: Optional[str] = None) -> str:
-        """시계열 분석 차트"""
-        fig, axes = plt.subplots(2, 2, figsize=self.figsize)
-        fig.suptitle('시계열 기반 투자 성과 분석', fontsize=16, fontweight='bold')
-        
+        # === 상단: 시나리오별 CAGR 차트 ===
         df = pd.DataFrame(scenarios_data)
         df['시작일'] = pd.to_datetime(df['시작일'])
-        df['시작연도'] = df['시작일'].dt.year
-        df['시작월'] = df['시작일'].dt.month
+        df = df.sort_values('시작일')
         
-        # 1. 월별 평균 수익률
-        ax1 = axes[0, 0]
-        monthly_stats = df.groupby('시작월').agg({
-            '일시투자_수익률': 'mean',
-            '적립식투자_수익률': 'mean'
-        })
-        
-        months = monthly_stats.index
-        ax1.plot(months, monthly_stats['일시투자_수익률'], 
-                marker='o', label='일시투자', color='#2E86AB', linewidth=2)
-        ax1.plot(months, monthly_stats['적립식투자_수익률'], 
-                marker='s', label='적립식투자', color='#F24236', linewidth=2)
-        ax1.set_xlabel('투자 시작 월')
-        ax1.set_ylabel('평균 수익률 (%)')
-        ax1.set_title('월별 평균 수익률')
-        ax1.legend()
-        ax1.grid(True, alpha=0.3)
-        ax1.set_xticks(range(1, 13))
-        
-        # 2. 연도별 평균 수익률
-        ax2 = axes[0, 1]
-        yearly_stats = df.groupby('시작연도').agg({
-            '일시투자_수익률': 'mean',
-            '적립식투자_수익률': 'mean'
-        })
-        
-        years = yearly_stats.index
-        ax2.plot(years, yearly_stats['일시투자_수익률'], 
-                marker='o', label='일시투자', color='#2E86AB', linewidth=2)
-        ax2.plot(years, yearly_stats['적립식투자_수익률'], 
-                marker='s', label='적립식투자', color='#F24236', linewidth=2)
-        ax2.set_xlabel('투자 시작 연도')
-        ax2.set_ylabel('평균 수익률 (%)')
-        ax2.set_title('연도별 평균 수익률')
-        ax2.legend()
-        ax2.grid(True, alpha=0.3)
-        
-        # 3. 수익률 차이 시계열
-        ax3 = axes[1, 0]
-        ax3.plot(df['시작일'], df['수익률차이'], 
-                alpha=0.7, linewidth=1, color='purple')
-        ax3.axhline(y=0, color='red', linestyle='--', alpha=0.8)
-        ax3.set_xlabel('투자 시작일')
-        ax3.set_ylabel('수익률 차이 (%p)')
-        ax3.set_title('시간별 수익률 차이 추이')
-        ax3.grid(True, alpha=0.3)
-        
-        # x축 날짜 포맷팅
-        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-        ax3.xaxis.set_major_locator(mdates.YearLocator(5))
-        plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
-        
-        # 4. 연도별 승률 막대 그래프
-        ax4 = axes[1, 1]
-        decade_stats = df.groupby(df['시작연도'] // 10 * 10).agg({
-            '승자': lambda x: (x == '일시투자').mean() * 100
-        }).rename(columns={'승자': '일시투자_승률'})
-        
-        decades = [f"{int(d)}년대" for d in decade_stats.index]
-        ax4.bar(decades, decade_stats['일시투자_승률'], 
-               color='#2E86AB', alpha=0.7)
-        ax4.axhline(y=50, color='red', linestyle='--', alpha=0.8)
-        ax4.set_xlabel('연대')
-        ax4.set_ylabel('일시투자 승률 (%)')
-        ax4.set_title('연대별 일시투자 승률')
-        ax4.grid(True, alpha=0.3, axis='y')
-        
-        plt.tight_layout()
-        
-        # 저장
-        if save_path is None:
-            save_path = f"results/charts/시계열분석_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        return save_path
-    
-    def plot_risk_return_analysis(self, scenarios_data: List[Dict],
-                                 save_path: Optional[str] = None) -> str:
-        """위험-수익률 분석 차트"""
-        fig, axes = plt.subplots(2, 2, figsize=self.figsize)
-        fig.suptitle('위험-수익률 분석', fontsize=16, fontweight='bold')
-        
-        df = pd.DataFrame(scenarios_data)
-        lump_sum_returns = df['일시투자_수익률'].values
-        dca_returns = df['적립식투자_수익률'].values
-        
-        # 1. 박스플롯 비교
-        ax1 = axes[0, 0]
-        data_to_plot = [lump_sum_returns, dca_returns]
-        labels = ['일시투자', '적립식투자']
-        colors = ['#2E86AB', '#F24236']
-        
-        bp = ax1.boxplot(data_to_plot, labels=labels, patch_artist=True)
-        for patch, color in zip(bp['boxes'], colors):
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-        
-        ax1.set_ylabel('수익률 (%)')
-        ax1.set_title('수익률 분포 비교')
-        ax1.grid(True, alpha=0.3)
-        
-        # 2. 누적 분포 함수 (CDF)
-        ax2 = axes[0, 1]
-        
-        # 정렬된 데이터와 누적 확률 계산
-        ls_sorted = np.sort(lump_sum_returns)
-        dca_sorted = np.sort(dca_returns)
-        ls_p = np.arange(1, len(ls_sorted) + 1) / len(ls_sorted)
-        dca_p = np.arange(1, len(dca_sorted) + 1) / len(dca_sorted)
-        
-        ax2.plot(ls_sorted, ls_p * 100, label='일시투자', 
-                color='#2E86AB', linewidth=2)
-        ax2.plot(dca_sorted, dca_p * 100, label='적립식투자', 
-                color='#F24236', linewidth=2)
-        ax2.set_xlabel('수익률 (%)')
-        ax2.set_ylabel('누적 확률 (%)')
-        ax2.set_title('누적 분포 함수')
-        ax2.legend()
-        ax2.grid(True, alpha=0.3)
-        
-        # 3. 분위수 비교
-        ax3 = axes[1, 0]
-        percentiles = [5, 10, 25, 50, 75, 90, 95]
-        ls_percentiles = np.percentile(lump_sum_returns, percentiles)
-        dca_percentiles = np.percentile(dca_returns, percentiles)
-        
-        x = np.arange(len(percentiles))
+        # X축: 시작일, Y축: CAGR
+        x_pos = np.arange(len(df))
         width = 0.35
         
-        ax3.bar(x - width/2, ls_percentiles, width, 
-               label='일시투자', color='#2E86AB', alpha=0.7)
-        ax3.bar(x + width/2, dca_percentiles, width, 
-               label='적립식투자', color='#F24236', alpha=0.7)
+        # 막대 그래프 생성
+        bars1 = ax1.bar(x_pos - width/2, df['일시투자_CAGR'], width, 
+                       label='일시투자 CAGR', color='#2E86AB', alpha=0.8)
+        bars2 = ax1.bar(x_pos + width/2, df['적립식투자_CAGR'], width, 
+                       label='적립식투자 CAGR', color='#F24236', alpha=0.8)
         
-        ax3.set_xlabel('분위수')
-        ax3.set_ylabel('수익률 (%)')
-        ax3.set_title('분위수별 수익률 비교')
-        ax3.set_xticks(x)
-        ax3.set_xticklabels([f'{p}%' for p in percentiles])
-        ax3.legend()
-        ax3.grid(True, alpha=0.3)
+        # 축 설정
+        ax1.set_xlabel('투자 시작일', fontsize=12)
+        ax1.set_ylabel('연평균수익률 (CAGR) %', fontsize=12)
+        ax1.set_title('투자 시작일별 연평균수익률(CAGR) - 전체 시나리오', fontsize=14, fontweight='bold', pad=15)
         
-        # 4. 위험-수익률 산점도 (연도별 색상)
-        ax4 = axes[1, 1]
-        df['시작연도'] = pd.to_datetime(df['시작일']).dt.year
+        # X축 레이블 설정 (5년 간격으로 표시)
+        step = max(1, len(df) // 20)  # 대략 20개 정도의 레이블만 표시
+        ax1.set_xticks(x_pos[::step])
+        ax1.set_xticklabels([date.strftime('%Y-%m') for date in df['시작일'].iloc[::step]], 
+                           rotation=45, ha='right')
         
-        # 연도별 평균과 표준편차 계산
-        yearly_stats = df.groupby('시작연도').agg({
-            '일시투자_수익률': ['mean', 'std'],
-            '적립식투자_수익률': ['mean', 'std']
-        })
+        # 범례 및 그리드
+        ax1.legend(fontsize=11)
+        ax1.grid(True, alpha=0.3, axis='y')
         
-        ls_mean = yearly_stats[('일시투자_수익률', 'mean')]
-        ls_std = yearly_stats[('일시투자_수익률', 'std')]
-        dca_mean = yearly_stats[('적립식투자_수익률', 'mean')]
-        dca_std = yearly_stats[('적립식투자_수익률', 'std')]
+        # Y축 범위 조정
+        y_min = min(df['일시투자_CAGR'].min(), df['적립식투자_CAGR'].min()) - 5
+        y_max = max(df['일시투자_CAGR'].max(), df['적립식투자_CAGR'].max()) + 5
+        ax1.set_ylim(y_min, y_max)
         
-        ax4.scatter(ls_std, ls_mean, alpha=0.7, s=50, 
-                   color='#2E86AB', label='일시투자')
-        ax4.scatter(dca_std, dca_mean, alpha=0.7, s=50, 
-                   color='#F24236', label='적립식투자')
+        # 0% 기준선 추가
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
         
-        ax4.set_xlabel('위험 (표준편차, %)')
-        ax4.set_ylabel('수익률 (평균, %)')
-        ax4.set_title('위험-수익률 관계 (연도별)')
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
+        # 통계 정보 텍스트 박스
+        ls_avg = df['일시투자_CAGR'].mean()
+        dca_avg = df['적립식투자_CAGR'].mean()
+        ls_max = df['일시투자_CAGR'].max()
+        dca_max = df['적립식투자_CAGR'].max()
+        ls_min = df['일시투자_CAGR'].min()
+        dca_min = df['적립식투자_CAGR'].min()
         
-        plt.tight_layout()
+        stats_text = f"""시나리오별 통계
+일시투자 CAGR: 평균 {ls_avg:.1f}% (최고 {ls_max:.1f}%, 최저 {ls_min:.1f}%)
+적립식투자 CAGR: 평균 {dca_avg:.1f}% (최고 {dca_max:.1f}%, 최저 {dca_min:.1f}%)
+총 시나리오: {len(df)}개"""
         
-        # 저장
-        if save_path is None:
-            save_path = f"results/charts/위험수익률분석_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        return save_path
-    
-    def plot_summary_report(self, stats: Dict,
-                           save_path: Optional[str] = None) -> str:
-        """요약 리포트 차트"""
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        fig.suptitle('확률 분석 요약 리포트', fontsize=16, fontweight='bold')
-        
-        # 1. 기본 통계 막대 차트
-        ax1 = axes[0, 0]
-        categories = ['승리 횟수', '승률 (%)']
-        lump_sum_values = [stats['기본_통계']['일시투자_승리'], 
-                          stats['기본_통계']['일시투자_승률']]
-        dca_values = [stats['기본_통계']['적립식투자_승리'], 
-                     stats['기본_통계']['적립식투자_승률']]
-        
-        x = np.arange(len(categories))
-        width = 0.35
-        
-        ax1.bar(x - width/2, lump_sum_values, width, 
-               label='일시투자', color='#2E86AB', alpha=0.8)
-        ax1.bar(x + width/2, dca_values, width, 
-               label='적립식투자', color='#F24236', alpha=0.8)
-        
-        ax1.set_xlabel('지표')
-        ax1.set_ylabel('값')
-        ax1.set_title('기본 성과 비교')
-        ax1.set_xticks(x)
-        ax1.set_xticklabels(categories)
-        ax1.legend()
-        ax1.grid(True, alpha=0.3)
-        
-        # 값 표시
-        for i, (ls_val, dca_val) in enumerate(zip(lump_sum_values, dca_values)):
-            ax1.text(i - width/2, ls_val + max(lump_sum_values) * 0.01, 
-                    f'{ls_val:.1f}', ha='center', va='bottom')
-            ax1.text(i + width/2, dca_val + max(dca_values) * 0.01, 
-                    f'{dca_val:.1f}', ha='center', va='bottom')
-        
-        # 2. 수익률 통계
-        ax2 = axes[0, 1]
-        return_categories = ['평균 수익률', '표준편차']
-        ls_return_values = [stats['수익률_통계']['일시투자_평균수익률'],
-                           stats['수익률_통계']['일시투자_표준편차']]
-        dca_return_values = [stats['수익률_통계']['적립식투자_평균수익률'],
-                            stats['수익률_통계']['적립식투자_표준편차']]
-        
-        x = np.arange(len(return_categories))
-        ax2.bar(x - width/2, ls_return_values, width, 
-               label='일시투자', color='#2E86AB', alpha=0.8)
-        ax2.bar(x + width/2, dca_return_values, width, 
-               label='적립식투자', color='#F24236', alpha=0.8)
-        
-        ax2.set_xlabel('지표')
-        ax2.set_ylabel('수익률 (%)')
-        ax2.set_title('수익률 통계')
-        ax2.set_xticks(x)
-        ax2.set_xticklabels(return_categories)
-        ax2.legend()
-        ax2.grid(True, alpha=0.3)
-        
-        # 3. 극값 분석
-        ax3 = axes[1, 0]
-        extreme_categories = ['최고 수익률', '최저 수익률']
-        ls_extreme_values = [stats['극값_분석']['일시투자_최고수익률'],
-                            stats['극값_분석']['일시투자_최저수익률']]
-        dca_extreme_values = [stats['극값_분석']['적립식투자_최고수익률'],
-                             stats['극값_분석']['적립식투자_최저수익률']]
-        
-        x = np.arange(len(extreme_categories))
-        ax3.bar(x - width/2, ls_extreme_values, width, 
-               label='일시투자', color='#2E86AB', alpha=0.8)
-        ax3.bar(x + width/2, dca_extreme_values, width, 
-               label='적립식투자', color='#F24236', alpha=0.8)
-        
-        ax3.set_xlabel('지표')
-        ax3.set_ylabel('수익률 (%)')
-        ax3.set_title('극값 분석')
-        ax3.set_xticks(x)
-        ax3.set_xticklabels(extreme_categories)
-        ax3.legend()
-        ax3.grid(True, alpha=0.3)
-        
-        # 4. 텍스트 요약
-        ax4 = axes[1, 1]
-        ax4.axis('off')
-        
-        summary_text = f"""
-📊 분석 요약
-
-총 시나리오 수: {stats['기본_통계']['총_시나리오수']:,}개
-분석 기간: 1972년 ~ 2015년 (43년)
-
-🏆 승률
-일시투자: {stats['기본_통계']['일시투자_승률']:.1f}%
-적립식투자: {stats['기본_통계']['적립식투자_승률']:.1f}%
-
-📈 평균 수익률
-일시투자: {stats['수익률_통계']['일시투자_평균수익률']:.2f}%
-적립식투자: {stats['수익률_통계']['적립식투자_평균수익률']:.2f}%
-평균 차이: {stats['수익률_통계']['평균_수익률차이']:.2f}%p
-
-📊 위험 (표준편차)
-일시투자: {stats['수익률_통계']['일시투자_표준편차']:.2f}%
-적립식투자: {stats['수익률_통계']['적립식투자_표준편차']:.2f}%
-
-🎯 최고 성과 시나리오
-일시투자: {stats['극값_시나리오']['일시투자_최고']['수익률']:.2f}%
-({stats['극값_시나리오']['일시투자_최고']['시작일']})
-
-적립식투자: {stats['극값_시나리오']['적립식투자_최고']['수익률']:.2f}%
-({stats['극값_시나리오']['적립식투자_최고']['시작일']})
-        """
-        
-        ax4.text(0.05, 0.95, summary_text, transform=ax4.transAxes, 
+        ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, 
                 fontsize=10, verticalalignment='top',
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
         
+        # === 하단: 연도별 평균 CAGR 차트 ===
+        # 연도별 데이터 생성 (연도별통계 시트와 동일한 로직)
+        df_copy = df.copy()
+        df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
+        
+        yearly_cagr = df_copy.groupby('연도').agg({
+            '일시투자_CAGR': 'mean',
+            '적립식투자_CAGR': 'mean',
+            '시작일': 'count'  # 시나리오 수
+        }).round(2)
+        
+        # 연도별 막대 그래프
+        years = yearly_cagr.index
+        x_pos_yearly = np.arange(len(years))
+        width_yearly = 0.35
+        
+        bars3 = ax2.bar(x_pos_yearly - width_yearly/2, yearly_cagr['일시투자_CAGR'], width_yearly, 
+                       label='일시투자 CAGR (연평균)', color='#2E86AB', alpha=0.8)
+        bars4 = ax2.bar(x_pos_yearly + width_yearly/2, yearly_cagr['적립식투자_CAGR'], width_yearly, 
+                       label='적립식투자 CAGR (연평균)', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax2.set_xlabel('투자 시작 연도', fontsize=12)
+        ax2.set_ylabel('연평균수익률 (CAGR) %', fontsize=12)
+        ax2.set_title('연도별 평균 연평균수익률(CAGR)', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정 (5년 간격)
+        step_yearly = max(1, len(years) // 10)
+        ax2.set_xticks(x_pos_yearly[::step_yearly])
+        ax2.set_xticklabels([str(year) for year in years[::step_yearly]], rotation=45)
+        
+        # 범례 및 그리드
+        ax2.legend(fontsize=11)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_min_yearly = min(yearly_cagr['일시투자_CAGR'].min(), yearly_cagr['적립식투자_CAGR'].min()) - 2
+        y_max_yearly = max(yearly_cagr['일시투자_CAGR'].max(), yearly_cagr['적립식투자_CAGR'].max()) + 2
+        ax2.set_ylim(y_min_yearly, y_max_yearly)
+        
+        # 0% 기준선 추가
+        ax2.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        
+        # 연도별 통계 정보
+        yearly_ls_avg = yearly_cagr['일시투자_CAGR'].mean()
+        yearly_dca_avg = yearly_cagr['적립식투자_CAGR'].mean()
+        yearly_ls_max = yearly_cagr['일시투자_CAGR'].max()
+        yearly_dca_max = yearly_cagr['적립식투자_CAGR'].max()
+        
+        yearly_stats_text = f"""연도별 통계
+일시투자 CAGR: 연평균 {yearly_ls_avg:.1f}% (최고연도 {yearly_ls_max:.1f}%)
+적립식투자 CAGR: 연평균 {yearly_dca_avg:.1f}% (최고연도 {yearly_dca_max:.1f}%)
+분석 연도: {len(years)}년"""
+        
+        ax2.text(0.02, 0.98, yearly_stats_text, transform=ax2.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.8))
+        
         plt.tight_layout()
         
         # 저장
         if save_path is None:
-            save_path = f"results/charts/요약리포트_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = f"results/charts/시작일별_CAGR_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        return save_path
+    
+    def plot_returns_by_start_date(self, scenarios_data: List[Dict], 
+                                  save_path: Optional[str] = None) -> str:
+        """시작일별 수익률 막대 차트 (시나리오별 + 연도별)"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
+        
+        # === 상단: 시나리오별 수익률 차트 ===
+        df = pd.DataFrame(scenarios_data)
+        df['시작일'] = pd.to_datetime(df['시작일'])
+        df = df.sort_values('시작일')
+        
+        # X축: 시작일, Y축: 수익률
+        x_pos = np.arange(len(df))
+        width = 0.35
+        
+        # 막대 그래프 생성
+        bars1 = ax1.bar(x_pos - width/2, df['일시투자_수익률'], width, 
+                       label='일시투자 수익률', color='#2E86AB', alpha=0.8)
+        bars2 = ax1.bar(x_pos + width/2, df['적립식투자_수익률'], width, 
+                       label='적립식투자 수익률', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax1.set_xlabel('투자 시작일', fontsize=12)
+        ax1.set_ylabel('총 수익률 (%)', fontsize=12)
+        ax1.set_title('투자 시작일별 총 수익률 - 전체 시나리오', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step = max(1, len(df) // 20)
+        ax1.set_xticks(x_pos[::step])
+        ax1.set_xticklabels([date.strftime('%Y-%m') for date in df['시작일'].iloc[::step]], 
+                           rotation=45, ha='right')
+        
+        # 범례 및 그리드
+        ax1.legend(fontsize=11)
+        ax1.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_min = min(df['일시투자_수익률'].min(), df['적립식투자_수익률'].min()) - 50
+        y_max = max(df['일시투자_수익률'].max(), df['적립식투자_수익률'].max()) + 50
+        ax1.set_ylim(y_min, y_max)
+        
+        # 0% 기준선 추가
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        
+        # 통계 정보 텍스트 박스
+        ls_avg = df['일시투자_수익률'].mean()
+        dca_avg = df['적립식투자_수익률'].mean()
+        ls_max = df['일시투자_수익률'].max()
+        dca_max = df['적립식투자_수익률'].max()
+        ls_min = df['일시투자_수익률'].min()
+        dca_min = df['적립식투자_수익률'].min()
+        
+        stats_text = f"""시나리오별 통계
+일시투자 수익률: 평균 {ls_avg:.1f}% (최고 {ls_max:.1f}%, 최저 {ls_min:.1f}%)
+적립식투자 수익률: 평균 {dca_avg:.1f}% (최고 {dca_max:.1f}%, 최저 {dca_min:.1f}%)
+총 시나리오: {len(df)}개"""
+        
+        ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
+        
+        # === 하단: 연도별 평균 수익률 차트 ===
+        df_copy = df.copy()
+        df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
+        
+        yearly_returns = df_copy.groupby('연도').agg({
+            '일시투자_수익률': 'mean',
+            '적립식투자_수익률': 'mean',
+            '시작일': 'count'
+        }).round(2)
+        
+        # 연도별 막대 그래프
+        years = yearly_returns.index
+        x_pos_yearly = np.arange(len(years))
+        width_yearly = 0.35
+        
+        bars3 = ax2.bar(x_pos_yearly - width_yearly/2, yearly_returns['일시투자_수익률'], width_yearly, 
+                       label='일시투자 수익률 (연평균)', color='#2E86AB', alpha=0.8)
+        bars4 = ax2.bar(x_pos_yearly + width_yearly/2, yearly_returns['적립식투자_수익률'], width_yearly, 
+                       label='적립식투자 수익률 (연평균)', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax2.set_xlabel('투자 시작 연도', fontsize=12)
+        ax2.set_ylabel('총 수익률 (%)', fontsize=12)
+        ax2.set_title('연도별 평균 총 수익률', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step_yearly = max(1, len(years) // 10)
+        ax2.set_xticks(x_pos_yearly[::step_yearly])
+        ax2.set_xticklabels([str(year) for year in years[::step_yearly]], rotation=45)
+        
+        # 범례 및 그리드
+        ax2.legend(fontsize=11)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_min_yearly = min(yearly_returns['일시투자_수익률'].min(), yearly_returns['적립식투자_수익률'].min()) - 20
+        y_max_yearly = max(yearly_returns['일시투자_수익률'].max(), yearly_returns['적립식투자_수익률'].max()) + 20
+        ax2.set_ylim(y_min_yearly, y_max_yearly)
+        
+        # 0% 기준선 추가
+        ax2.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        
+        # 연도별 통계 정보
+        yearly_ls_avg = yearly_returns['일시투자_수익률'].mean()
+        yearly_dca_avg = yearly_returns['적립식투자_수익률'].mean()
+        yearly_ls_max = yearly_returns['일시투자_수익률'].max()
+        yearly_dca_max = yearly_returns['적립식투자_수익률'].max()
+        
+        yearly_stats_text = f"""연도별 통계
+일시투자 수익률: 연평균 {yearly_ls_avg:.1f}% (최고연도 {yearly_ls_max:.1f}%)
+적립식투자 수익률: 연평균 {yearly_dca_avg:.1f}% (최고연도 {yearly_dca_max:.1f}%)
+분석 연도: {len(years)}년"""
+        
+        ax2.text(0.02, 0.98, yearly_stats_text, transform=ax2.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgreen", alpha=0.8))
+        
+        plt.tight_layout()
+        
+        # 저장
+        if save_path is None:
+            save_path = f"results/charts/시작일별_수익률_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        return save_path
+    
+    def plot_mdd_by_start_date(self, scenarios_data: List[Dict], 
+                              save_path: Optional[str] = None) -> str:
+        """시작일별 MDD 막대 차트 (시나리오별 + 연도별)"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
+        
+        # === 상단: 시나리오별 MDD 차트 ===
+        df = pd.DataFrame(scenarios_data)
+        df['시작일'] = pd.to_datetime(df['시작일'])
+        df = df.sort_values('시작일')
+        
+        # X축: 시작일, Y축: MDD (음수 값이므로 절댓값으로 표시)
+        x_pos = np.arange(len(df))
+        width = 0.35
+        
+        # MDD는 음수이므로 절댓값으로 표시 (하락폭을 양수로)
+        ls_mdd_abs = abs(df['일시투자_MDD'])
+        dca_mdd_abs = abs(df['적립식투자_MDD'])
+        
+        # 막대 그래프 생성
+        bars1 = ax1.bar(x_pos - width/2, ls_mdd_abs, width, 
+                       label='일시투자 MDD', color='#2E86AB', alpha=0.8)
+        bars2 = ax1.bar(x_pos + width/2, dca_mdd_abs, width, 
+                       label='적립식투자 MDD', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax1.set_xlabel('투자 시작일', fontsize=12)
+        ax1.set_ylabel('최대낙폭 (MDD) %', fontsize=12)
+        ax1.set_title('투자 시작일별 최대낙폭(MDD) - 전체 시나리오', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step = max(1, len(df) // 20)
+        ax1.set_xticks(x_pos[::step])
+        ax1.set_xticklabels([date.strftime('%Y-%m') for date in df['시작일'].iloc[::step]], 
+                           rotation=45, ha='right')
+        
+        # 범례 및 그리드
+        ax1.legend(fontsize=11)
+        ax1.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정 (0부터 시작, MDD는 하락폭이므로)
+        y_max = max(ls_mdd_abs.max(), dca_mdd_abs.max()) + 5
+        ax1.set_ylim(0, y_max)
+        
+        # 통계 정보 텍스트 박스
+        ls_avg = ls_mdd_abs.mean()
+        dca_avg = dca_mdd_abs.mean()
+        ls_max = ls_mdd_abs.max()
+        dca_max = dca_mdd_abs.max()
+        ls_min = ls_mdd_abs.min()
+        dca_min = dca_mdd_abs.min()
+        
+        stats_text = f"""시나리오별 통계
+일시투자 MDD: 평균 {ls_avg:.1f}% (최대 {ls_max:.1f}%, 최소 {ls_min:.1f}%)
+적립식투자 MDD: 평균 {dca_avg:.1f}% (최대 {dca_max:.1f}%, 최소 {dca_min:.1f}%)
+총 시나리오: {len(df)}개"""
+        
+        ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
+        
+        # === 하단: 연도별 평균 MDD 차트 ===
+        df_copy = df.copy()
+        df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
+        
+        yearly_mdd = df_copy.groupby('연도').agg({
+            '일시투자_MDD': lambda x: abs(x).mean(),  # 절댓값의 평균
+            '적립식투자_MDD': lambda x: abs(x).mean(),
+            '시작일': 'count'
+        }).round(2)
+        
+        # 연도별 막대 그래프
+        years = yearly_mdd.index
+        x_pos_yearly = np.arange(len(years))
+        width_yearly = 0.35
+        
+        bars3 = ax2.bar(x_pos_yearly - width_yearly/2, yearly_mdd['일시투자_MDD'], width_yearly, 
+                       label='일시투자 MDD (연평균)', color='#2E86AB', alpha=0.8)
+        bars4 = ax2.bar(x_pos_yearly + width_yearly/2, yearly_mdd['적립식투자_MDD'], width_yearly, 
+                       label='적립식투자 MDD (연평균)', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax2.set_xlabel('투자 시작 연도', fontsize=12)
+        ax2.set_ylabel('최대낙폭 (MDD) %', fontsize=12)
+        ax2.set_title('연도별 평균 최대낙폭(MDD)', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step_yearly = max(1, len(years) // 10)
+        ax2.set_xticks(x_pos_yearly[::step_yearly])
+        ax2.set_xticklabels([str(year) for year in years[::step_yearly]], rotation=45)
+        
+        # 범례 및 그리드
+        ax2.legend(fontsize=11)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_max_yearly = max(yearly_mdd['일시투자_MDD'].max(), yearly_mdd['적립식투자_MDD'].max()) + 2
+        ax2.set_ylim(0, y_max_yearly)
+        
+        # 연도별 통계 정보
+        yearly_ls_avg = yearly_mdd['일시투자_MDD'].mean()
+        yearly_dca_avg = yearly_mdd['적립식투자_MDD'].mean()
+        yearly_ls_max = yearly_mdd['일시투자_MDD'].max()
+        yearly_dca_max = yearly_mdd['적립식투자_MDD'].max()
+        
+        yearly_stats_text = f"""연도별 통계
+일시투자 MDD: 연평균 {yearly_ls_avg:.1f}% (최악연도 {yearly_ls_max:.1f}%)
+적립식투자 MDD: 연평균 {yearly_dca_avg:.1f}% (최악연도 {yearly_dca_max:.1f}%)
+분석 연도: {len(years)}년"""
+        
+        ax2.text(0.02, 0.98, yearly_stats_text, transform=ax2.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightcoral", alpha=0.8))
+        
+        plt.tight_layout()
+        
+        # 저장
+        if save_path is None:
+            save_path = f"results/charts/시작일별_MDD_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        return save_path
+    
+    def plot_sharpe_by_start_date(self, scenarios_data: List[Dict], 
+                                 save_path: Optional[str] = None) -> str:
+        """시작일별 샤프지수 막대 차트 (시나리오별 + 연도별)"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
+        
+        # === 상단: 시나리오별 샤프지수 차트 ===
+        df = pd.DataFrame(scenarios_data)
+        df['시작일'] = pd.to_datetime(df['시작일'])
+        df = df.sort_values('시작일')
+        
+        # X축: 시작일, Y축: 샤프지수
+        x_pos = np.arange(len(df))
+        width = 0.35
+        
+        # 막대 그래프 생성
+        bars1 = ax1.bar(x_pos - width/2, df['일시투자_샤프지수'], width, 
+                       label='일시투자 샤프지수', color='#2E86AB', alpha=0.8)
+        bars2 = ax1.bar(x_pos + width/2, df['적립식투자_샤프지수'], width, 
+                       label='적립식투자 샤프지수', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax1.set_xlabel('투자 시작일', fontsize=12)
+        ax1.set_ylabel('샤프지수', fontsize=12)
+        ax1.set_title('투자 시작일별 샤프지수 - 전체 시나리오', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step = max(1, len(df) // 20)
+        ax1.set_xticks(x_pos[::step])
+        ax1.set_xticklabels([date.strftime('%Y-%m') for date in df['시작일'].iloc[::step]], 
+                           rotation=45, ha='right')
+        
+        # 범례 및 그리드
+        ax1.legend(fontsize=11)
+        ax1.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_min = min(df['일시투자_샤프지수'].min(), df['적립식투자_샤프지수'].min()) - 0.2
+        y_max = max(df['일시투자_샤프지수'].max(), df['적립식투자_샤프지수'].max()) + 0.2
+        ax1.set_ylim(y_min, y_max)
+        
+        # 0 기준선 추가
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        # 1.0 기준선 추가 (우수한 샤프지수 기준)
+        ax1.axhline(y=1.0, color='green', linestyle='--', alpha=0.5, linewidth=1, label='우수 기준(1.0)')
+        
+        # 통계 정보 텍스트 박스
+        ls_avg = df['일시투자_샤프지수'].mean()
+        dca_avg = df['적립식투자_샤프지수'].mean()
+        ls_max = df['일시투자_샤프지수'].max()
+        dca_max = df['적립식투자_샤프지수'].max()
+        ls_min = df['일시투자_샤프지수'].min()
+        dca_min = df['적립식투자_샤프지수'].min()
+        
+        stats_text = f"""시나리오별 통계
+일시투자 샤프지수: 평균 {ls_avg:.2f} (최고 {ls_max:.2f}, 최저 {ls_min:.2f})
+적립식투자 샤프지수: 평균 {dca_avg:.2f} (최고 {dca_max:.2f}, 최저 {dca_min:.2f})
+총 시나리오: {len(df)}개"""
+        
+        ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
+        
+        # === 하단: 연도별 평균 샤프지수 차트 ===
+        df_copy = df.copy()
+        df_copy['연도'] = pd.to_datetime(df_copy['시작일']).dt.year
+        
+        yearly_sharpe = df_copy.groupby('연도').agg({
+            '일시투자_샤프지수': 'mean',
+            '적립식투자_샤프지수': 'mean',
+            '시작일': 'count'
+        }).round(3)
+        
+        # 연도별 막대 그래프
+        years = yearly_sharpe.index
+        x_pos_yearly = np.arange(len(years))
+        width_yearly = 0.35
+        
+        bars3 = ax2.bar(x_pos_yearly - width_yearly/2, yearly_sharpe['일시투자_샤프지수'], width_yearly, 
+                       label='일시투자 샤프지수 (연평균)', color='#2E86AB', alpha=0.8)
+        bars4 = ax2.bar(x_pos_yearly + width_yearly/2, yearly_sharpe['적립식투자_샤프지수'], width_yearly, 
+                       label='적립식투자 샤프지수 (연평균)', color='#F24236', alpha=0.8)
+        
+        # 축 설정
+        ax2.set_xlabel('투자 시작 연도', fontsize=12)
+        ax2.set_ylabel('샤프지수', fontsize=12)
+        ax2.set_title('연도별 평균 샤프지수', fontsize=14, fontweight='bold', pad=15)
+        
+        # X축 레이블 설정
+        step_yearly = max(1, len(years) // 10)
+        ax2.set_xticks(x_pos_yearly[::step_yearly])
+        ax2.set_xticklabels([str(year) for year in years[::step_yearly]], rotation=45)
+        
+        # 범례 및 그리드
+        ax2.legend(fontsize=11)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Y축 범위 조정
+        y_min_yearly = min(yearly_sharpe['일시투자_샤프지수'].min(), yearly_sharpe['적립식투자_샤프지수'].min()) - 0.1
+        y_max_yearly = max(yearly_sharpe['일시투자_샤프지수'].max(), yearly_sharpe['적립식투자_샤프지수'].max()) + 0.1
+        ax2.set_ylim(y_min_yearly, y_max_yearly)
+        
+        # 기준선들
+        ax2.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        ax2.axhline(y=1.0, color='green', linestyle='--', alpha=0.5, linewidth=1)
+        
+        # 연도별 통계 정보
+        yearly_ls_avg = yearly_sharpe['일시투자_샤프지수'].mean()
+        yearly_dca_avg = yearly_sharpe['적립식투자_샤프지수'].mean()
+        yearly_ls_max = yearly_sharpe['일시투자_샤프지수'].max()
+        yearly_dca_max = yearly_sharpe['적립식투자_샤프지수'].max()
+        
+        yearly_stats_text = f"""연도별 통계
+일시투자 샤프지수: 연평균 {yearly_ls_avg:.2f} (최고연도 {yearly_ls_max:.2f})
+적립식투자 샤프지수: 연평균 {yearly_dca_avg:.2f} (최고연도 {yearly_dca_max:.2f})
+분석 연도: {len(years)}년"""
+        
+        ax2.text(0.02, 0.98, yearly_stats_text, transform=ax2.transAxes, 
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.8))
+        
+        plt.tight_layout()
+        
+        # 저장
+        if save_path is None:
+            save_path = f"results/charts/시작일별_샤프지수_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')

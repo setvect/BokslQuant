@@ -382,29 +382,6 @@ class ProbabilisticBacktester:
         
         return stats
     
-    def export_results(self, output_path: str = "results/") -> str:
-        """결과를 CSV로 내보내기"""
-        import os
-        from datetime import datetime
-        
-        if not self.scenarios:
-            raise ValueError("분석된 시나리오가 없습니다.")
-        
-        # 결과 디렉토리 생성
-        os.makedirs(output_path, exist_ok=True)
-        
-        # 데이터프레임 생성
-        df = pd.DataFrame([scenario.to_dict() for scenario in self.scenarios])
-        
-        # 파일명 생성
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"확률분석_나스닥_{timestamp}.csv"
-        filepath = os.path.join(output_path, filename)
-        
-        # CSV 저장
-        df.to_csv(filepath, index=False, encoding='utf-8-sig')
-        
-        return filepath
     
     def export_to_excel(self, output_path: str = "results/") -> str:
         """결과를 Excel 파일로 내보내기 (다중 시트)"""
@@ -430,17 +407,17 @@ class ProbabilisticBacktester:
         
         # Excel Writer 생성
         with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
-            # 1. 상세 데이터 시트 (수익률을 소수로 변환)
+            # 1. 전체 시나리오 시트 (수익률을 소수로 변환)
             df_excel = self._prepare_data_for_excel(df)
-            df_excel.to_excel(writer, sheet_name='상세데이터', index=False)
+            df_excel.to_excel(writer, sheet_name='전체시나리오', index=False)
             
-            # 2. 통계 요약 시트
+            # 2. 전체 통계 시트
             self._create_statistics_sheet(writer, stats)
             
-            # 3. 분석 요약 시트
+            # 3. 분석 리포트 시트
             self._create_analysis_sheet(writer, df, stats)
             
-            # 4. 차트 데이터 시트
+            # 4. 연도별 통계 시트
             self._create_chart_data_sheet(writer, df)
         
         # 엑셀 파일 서식 적용
@@ -526,7 +503,7 @@ class ProbabilisticBacktester:
         
         # DataFrame으로 변환 후 저장
         stats_df = pd.DataFrame(stats_data)
-        stats_df.to_excel(writer, sheet_name='통계요약', index=False, header=False)
+        stats_df.to_excel(writer, sheet_name='전체통계', index=False, header=False)
     
     def _create_analysis_sheet(self, writer, df: pd.DataFrame, stats: Dict) -> None:
         """분석 요약 시트 생성"""
@@ -610,7 +587,7 @@ class ProbabilisticBacktester:
         
         # DataFrame으로 변환 후 저장
         analysis_df = pd.DataFrame(analysis_data)
-        analysis_df.to_excel(writer, sheet_name='분석요약', index=False, header=False)
+        analysis_df.to_excel(writer, sheet_name='분석리포트', index=False, header=False)
     
     def _create_chart_data_sheet(self, writer, df: pd.DataFrame) -> None:
         """차트용 데이터 시트 생성"""
@@ -678,7 +655,7 @@ class ProbabilisticBacktester:
         chart_data_excel = self._prepare_chart_data_for_excel(chart_data)
         
         # 저장
-        chart_data_excel.to_excel(writer, sheet_name='차트데이터')
+        chart_data_excel.to_excel(writer, sheet_name='연도별통계')
     
     def _format_excel_file(self, filepath: str) -> None:
         """Excel 파일 서식 적용"""
@@ -689,21 +666,21 @@ class ProbabilisticBacktester:
             
             wb = load_workbook(filepath)
             
-            # 상세데이터 시트 서식
-            if '상세데이터' in wb.sheetnames:
-                self._format_detail_sheet(wb['상세데이터'])
+            # 전체시나리오 시트 서식
+            if '전체시나리오' in wb.sheetnames:
+                self._format_detail_sheet(wb['전체시나리오'])
             
-            # 통계요약 시트 서식
-            if '통계요약' in wb.sheetnames:
-                self._format_statistics_sheet(wb['통계요약'])
+            # 전체통계 시트 서식
+            if '전체통계' in wb.sheetnames:
+                self._format_statistics_sheet(wb['전체통계'])
             
-            # 분석요약 시트 서식
-            if '분석요약' in wb.sheetnames:
-                self._format_analysis_sheet(wb['분석요약'])
+            # 분석리포트 시트 서식
+            if '분석리포트' in wb.sheetnames:
+                self._format_analysis_sheet(wb['분석리포트'])
             
-            # 차트데이터 시트 서식
-            if '차트데이터' in wb.sheetnames:
-                self._format_chart_data_sheet(wb['차트데이터'])
+            # 연도별통계 시트 서식
+            if '연도별통계' in wb.sheetnames:
+                self._format_chart_data_sheet(wb['연도별통계'])
             
             wb.save(filepath)
             
