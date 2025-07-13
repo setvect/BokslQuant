@@ -34,7 +34,7 @@ def main():
         investment_period_months=60,  # 5년간 적립
         analysis_period_years=10,  # 10년 후 성과 측정
         # start_year=1972,
-        start_year=2000,
+        start_year=2010,
         start_month=1,
         end_year=2015,
         end_month=1

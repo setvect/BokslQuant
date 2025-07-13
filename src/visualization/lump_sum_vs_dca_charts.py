@@ -14,10 +14,16 @@ from datetime import datetime
 class LumpSumVsDcaVisualizer:
     """일시투자 vs 적립식투자(DCA) 분석 시각화 클래스"""
     
+    # Excel과 동일한 색상 테마
+    COLORS = {
+        'lump_sum': '#2E86AB',      # 파란색 (일시투자)
+        'dca': '#F24236',           # 빨간색 (적립투자)
+        'neutral': '#666666'        # 회색 (기타)
+    }
+    
     def __init__(self, figsize: tuple = (16, 12)):
         self.figsize = figsize
         plt.style.use('default')
-        sns.set_palette("husl")
         
         # 한글 폰트 설정
         import matplotlib.font_manager as fm

@@ -70,6 +70,12 @@ def main():
     print(f"   일시금투자 최종가치: ${end_record.lump_sum_value:,.0f}")
     print(f"   일시금투자 총수익률: {end_record.lump_sum_cumulative_return:.2f}%")
     print(f"   일시금투자 최대낙폭: {end_record.lump_sum_mdd:.2f}%")
+    
+    # MDD 디버깅: 최악의 월을 찾기
+    worst_lump_sum_mdd = min(record.lump_sum_mdd for record in records)
+    worst_dca_mdd = min(record.dca_mdd for record in records)
+    print(f"   [디버그] 일시금 최악 MDD: {worst_lump_sum_mdd:.2f}%")
+    print(f"   [디버그] 적립식 최악 MDD: {worst_dca_mdd:.2f}%")
     print()
     print(f"   적립식투자 최종가치: ${end_record.dca_value:,.0f}")
     print(f"   적립식투자 총수익률: {end_record.dca_cumulative_return:.2f}%") 

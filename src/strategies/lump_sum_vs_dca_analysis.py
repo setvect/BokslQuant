@@ -127,18 +127,18 @@ class LumpSumVsDcaAnalyzer:
     # 색상 테마 정의
     COLORS = {
         'lump_sum': {
-            'primary': '2E86AB',      # 진한 파란색 (일시투자)
-            'light': 'A8DADC',        # 연한 파란색
-            'chart': '#2E86AB'        # 차트용 (# 포함)
+            'primary': '2E86AB',      # 진한 (일시투자)
+            'light': '2E86AB',        #  
+            'chart': '#2E86AB'     # 차트용 (# 포함)
         },
         'dca': {
-            'primary': 'F24236',      # 진한 빨간색 (적립투자) 
-            'light': 'F1FAEE',        # 연한 빨간색
-            'chart': '#F24236'        # 차트용 (# 포함)
+            'primary': '1DC225',      # 진한 (적립투자) 
+            'light': '1DC225',        #  
+            'chart': '#1DC225'     # 차트용 (# 포함)
         },
         'neutral': {
-            'header': '366092',       # 기본 헤더
-            'light_gray': 'F8F9FA',   # 연한 회색
+            'header': '4D524D',       # 기본 헤더
+            'light_gray': '4D524D',   # 
             'border': 'E9ECEF'        # 테두리
         }
     }
