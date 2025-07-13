@@ -104,7 +104,6 @@ class MonthlyRecord:
             
             # 일시금 투자
             "일시금_포트폴리오가치": round(self.lump_sum_value, 0),
-            "일시금_월별수익률": round(self.lump_sum_return / 100, 4),  # Excel 퍼센트 포맷용으로 100으로 나누기
             "일시금_누적수익률": round(self.lump_sum_cumulative_return / 100, 4),
             
             # 적립식 투자
@@ -114,8 +113,10 @@ class MonthlyRecord:
             "적립식_누적투자금액": round(self.dca_total_invested, 0),
             "적립식_평균단가": round(self.dca_average_price, 2),
             "적립식_포트폴리오가치": round(self.dca_value, 0),
-            "적립식_월별수익률": round(self.dca_return / 100, 4),  # Excel 퍼센트 포맷용으로 100으로 나누기
-            "적립식_누적수익률": round(self.dca_cumulative_return / 100, 4)
+            "적립식_누적수익률": round(self.dca_cumulative_return / 100, 4),
+            
+            # 공통 컬럼 (월별수익률)
+            "월별수익률": round(self.lump_sum_return / 100, 4)  # 일시금과 적립식의 월별수익률이 같으므로 공통 컬럼으로 처리
         }
 
 
@@ -1113,9 +1114,17 @@ class LumpSumVsDcaAnalyzer:
                 dca_cumulative_return = 0.0
             else:
                 if dca_total_invested > 0:
-                    prev_value = records[-1].dca_value
-                    if prev_value > 0:
-                        dca_return = (dca_value / prev_value - 1) * 100
+                    # 이번 달 투자 전 포트폴리오 가치 계산 (직전 달 수량 × 이번 달 가격)
+                    prev_shares = records[-1].dca_total_shares
+                    prev_portfolio_value_at_current_price = prev_shares * current_price
+                    
+                    if prev_portfolio_value_at_current_price > 0:
+                        # 월별 수익률 = (이번달 투자 전 가치 / 직전달 가치 - 1) × 100
+                        prev_value = records[-1].dca_value
+                        if prev_value > 0:
+                            dca_return = (prev_portfolio_value_at_current_price / prev_value - 1) * 100
+                        else:
+                            dca_return = 0.0
                     else:
                         dca_return = 0.0
                     dca_cumulative_return = (dca_value / dca_total_invested - 1) * 100
@@ -1264,7 +1273,6 @@ class LumpSumVsDcaAnalyzer:
             "경과월수": 8,
             "지수가격": 12,
             "일시금_포트폴리오가치": 18,
-            "일시금_월별수익률": 15,
             "일시금_누적수익률": 15,
             "적립식_월투자금액": 15,
             "적립식_월구매수량": 15,
@@ -1272,8 +1280,8 @@ class LumpSumVsDcaAnalyzer:
             "적립식_누적투자금액": 18,
             "적립식_평균단가": 15,
             "적립식_포트폴리오가치": 18,
-            "적립식_월별수익률": 15,
-            "적립식_누적수익률": 15
+            "적립식_누적수익률": 15,
+            "월별수익률": 15
         }
         
         for col_idx, header in enumerate(headers, 1):
