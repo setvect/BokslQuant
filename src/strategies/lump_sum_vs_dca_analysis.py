@@ -1609,26 +1609,27 @@ class LumpSumVsDcaAnalyzer:
         lump_sum_returns = [record.lump_sum_cumulative_return for record in records]
         dca_returns = [record.dca_cumulative_return for record in records]
         
-        # 월별 MDD 계산 (포트폴리오 가치 기반)
+        # Excel과 동일한 수익률 기반 MDD 계산
         lump_sum_mdds = []
         dca_mdds = []
         
-        # 일시금 MDD 계산
-        lump_sum_peak = records[0].lump_sum_value  # 초기값으로 시작
-        for record in records:
-            lump_sum_peak = max(lump_sum_peak, record.lump_sum_value)
-            mdd = (record.lump_sum_value / lump_sum_peak - 1) * 100 if lump_sum_peak > 0 else 0
-            lump_sum_mdds.append(mdd)
+        # 수익률 기반 MDD 계산 (Excel과 동일)
+        lump_sum_peak_return = 0.0
+        dca_peak_return = 0.0
         
-        # 적립식 MDD 계산
-        dca_peak = 0
         for record in records:
-            if record.dca_value > 0:  # 투자가 시작된 후부터
-                dca_peak = max(dca_peak, record.dca_value)
-                mdd = (record.dca_value / dca_peak - 1) * 100 if dca_peak > 0 else 0
-                dca_mdds.append(mdd)
-            else:
-                dca_mdds.append(0)
+            # 일시금 누적 최대 수익률 및 MDD 계산
+            current_lump_return = record.lump_sum_cumulative_return
+            lump_sum_peak_return = max(lump_sum_peak_return, current_lump_return)
+            lump_mdd = current_lump_return - lump_sum_peak_return
+            lump_sum_mdds.append(lump_mdd)
+            
+            # 적립식 누적 최대 수익률 및 MDD 계산  
+            current_dca_return = record.dca_cumulative_return
+            if current_dca_return != 0:  # 투자가 시작된 후부터
+                dca_peak_return = max(dca_peak_return, current_dca_return)
+            dca_mdd = current_dca_return - dca_peak_return
+            dca_mdds.append(dca_mdd)
         
         # === 수익률 변화 차트 ===
         plt.figure(figsize=(16, 10))
