@@ -6,7 +6,8 @@
       "Bash(git add:*)",
       "Bash(rm:*)",
       "Bash(git commit:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

@@ -1,5 +1,5 @@
 """
-확률 기반 백테스팅 분석 모듈
+일시투자 vs 적립식투자(DCA) 백테스팅 분석 모듈
 1972년~2015년 매월 시작점에서 일시투자 vs 적립식투자 성과 비교
 """
 from dataclasses import dataclass
@@ -69,8 +69,8 @@ class ScenarioResult:
         }
 
 
-class ProbabilisticBacktester:
-    """확률 기반 백테스팅 엔진"""
+class LumpSumVsDcaAnalyzer:
+    """일시투자 vs 적립식투자(DCA) 백테스팅 분석 엔진"""
     
     def __init__(self, config: ScenarioConfig):
         self.config = config
@@ -396,7 +396,7 @@ class ProbabilisticBacktester:
         
         # 파일명 생성
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"확률분석_나스닥_{timestamp}.xlsx"
+        filename = f"일시투자vs적립투자_나스닥_{timestamp}.xlsx"
         filepath = os.path.join(output_path, filename)
         
         # 데이터프레임 생성

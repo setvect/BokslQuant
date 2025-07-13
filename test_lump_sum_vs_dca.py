@@ -1,20 +1,20 @@
 """
-확률 기반 백테스팅 분석 테스트 실행 코드
+일시투자 vs 적립식투자(DCA) 백테스팅 분석 테스트 실행 코드
 1972년~2015년 나스닥 데이터로 일시투자 vs 적립식투자 516개 시나리오 분석
 """
 import sys
 import os
 sys.path.append('.')
 
-from src.strategies.probabilistic_analysis import ProbabilisticBacktester, ScenarioConfig
+from src.strategies.lump_sum_vs_dca_analysis import LumpSumVsDcaAnalyzer, ScenarioConfig
 from src.backtesting.engine import InvestmentBacktester
-from src.visualization.probabilistic_charts import ProbabilisticVisualizer
+from src.visualization.lump_sum_vs_dca_charts import LumpSumVsDcaVisualizer
 import pandas as pd
 
 
 def main():
     """확률 기반 분석 메인 실행 함수"""
-    print("🎲 확률 기반 투자 전략 분석 시작")
+    print("🎲 일시투자 vs 적립식투자 백테스팅 분석 시작")
     print("=" * 70)
     
     # 1. 나스닥 데이터 로드
@@ -50,8 +50,8 @@ def main():
     print(f"   월 적립금액: ${monthly_amount:,.0f}")
     
     # 3. 확률 분석 실행
-    print(f"\n🎯 확률 분석 시작...")
-    analyzer = ProbabilisticBacktester(config)
+    print(f"\n🎯 일시투자 vs 적립투자 분석 시작...")
+    analyzer = LumpSumVsDcaAnalyzer(config)
     
     try:
         # 시나리오 개수 미리 확인
@@ -109,7 +109,7 @@ def main():
     # 6. 시각화 생성
     print(f"\n📊 차트 생성 중...")
     try:
-        visualizer = ProbabilisticVisualizer()
+        visualizer = LumpSumVsDcaVisualizer()
         
         # 시작일별 CAGR 막대 차트
         chart1_path = visualizer.plot_cagr_by_start_date(scenarios_data)
@@ -201,7 +201,7 @@ def quick_analysis():
         end_month=1
     )
     
-    analyzer = ProbabilisticBacktester(config)
+    analyzer = LumpSumVsDcaAnalyzer(config)
     analyzer.run_all_scenarios(nasdaq_data)
     
     if analyzer.scenarios:
@@ -209,7 +209,7 @@ def quick_analysis():
         print_summary_statistics(stats)
         
         # 간단한 차트만 생성
-        visualizer = ProbabilisticVisualizer()
+        visualizer = LumpSumVsDcaVisualizer()
         scenarios_data = analyzer.get_scenarios_data()
         chart_path = visualizer.plot_cagr_by_start_date(scenarios_data)
         print(f"✅ 차트 저장: {chart_path}")

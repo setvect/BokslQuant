@@ -1,5 +1,5 @@
 """
-확률 기반 분석 전용 시각화 모듈
+일시투자 vs 적립식투자(DCA) 분석 전용 시각화 모듈
 """
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -11,8 +11,8 @@ import os
 from datetime import datetime
 
 
-class ProbabilisticVisualizer:
-    """확률 기반 분석 시각화 클래스"""
+class LumpSumVsDcaVisualizer:
+    """일시투자 vs 적립식투자(DCA) 분석 시각화 클래스"""
     
     def __init__(self, figsize: tuple = (16, 12)):
         self.figsize = figsize
