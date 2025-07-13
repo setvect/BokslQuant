@@ -106,7 +106,7 @@ def main():
     # 6. 차트 생성
     print(f"\\n📊 차트 생성 중...")
     try:
-        returns_chart, mdd_chart = analyzer.create_detailed_charts(records, target_scenario)
+        returns_chart, mdd_chart = analyzer.create_detailed_charts(records, target_scenario, nasdaq_data)
         print(f"✅ 수익률 변화 차트: {returns_chart}")
         print(f"✅ MDD 변화 차트: {mdd_chart}")
     except Exception as e:
