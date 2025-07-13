@@ -211,7 +211,7 @@ def quick_analysis():
         # 간단한 차트만 생성
         visualizer = ProbabilisticVisualizer()
         scenarios_data = analyzer.get_scenarios_data()
-        chart_path = visualizer.plot_summary_report(stats)
+        chart_path = visualizer.plot_cagr_by_start_date(scenarios_data)
         print(f"✅ 차트 저장: {chart_path}")
     else:
         print("❌ 분석 가능한 시나리오가 없습니다.")
