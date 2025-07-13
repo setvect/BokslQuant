@@ -178,7 +178,7 @@ class LumpSumVsDcaVisualizer:
         
         # 저장
         if save_path is None:
-            save_path = f"results/charts/시작일별_CAGR_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = f"results/lump_sum_vs_dca/charts/시작일별_CAGR_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -307,7 +307,7 @@ class LumpSumVsDcaVisualizer:
         
         # 저장
         if save_path is None:
-            save_path = f"results/charts/시작일별_수익률_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = f"results/lump_sum_vs_dca/charts/시작일별_수익률_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -432,7 +432,7 @@ class LumpSumVsDcaVisualizer:
         
         # 저장
         if save_path is None:
-            save_path = f"results/charts/시작일별_MDD_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = f"results/lump_sum_vs_dca/charts/시작일별_MDD_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -564,7 +564,7 @@ class LumpSumVsDcaVisualizer:
         
         # 저장
         if save_path is None:
-            save_path = f"results/charts/시작일별_샤프지수_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = f"results/lump_sum_vs_dca/charts/시작일별_샤프지수_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')

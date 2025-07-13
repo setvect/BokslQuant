@@ -383,7 +383,7 @@ class LumpSumVsDcaAnalyzer:
         return stats
     
     
-    def export_to_excel(self, output_path: str = "results/") -> str:
+    def export_to_excel(self, output_path: str = "results/lump_sum_vs_dca/") -> str:
         """결과를 Excel 파일로 내보내기 (다중 시트)"""
         import os
         from datetime import datetime
