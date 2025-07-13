@@ -69,6 +69,56 @@ class ScenarioResult:
         }
 
 
+@dataclass
+class MonthlyRecord:
+    """월별 투자 진행 상황 기록"""
+    date: str
+    month_num: int  # 투자 시작 후 경과 월수 (0부터 시작)
+    index_price: float  # 해당 월의 지수 가격
+    
+    # 일시금 투자 정보
+    lump_sum_value: float  # 현재 포트폴리오 가치
+    lump_sum_return: float  # 월별 수익률 (%)
+    lump_sum_cumulative_return: float  # 누적 수익률 (%)
+    lump_sum_mdd: float  # 현재까지의 최대낙폭 (%)
+    
+    # 적립식 투자 정보
+    dca_monthly_investment: float  # 이번 달 투자금액
+    dca_shares_bought: float  # 이번 달 구매 수량
+    dca_total_shares: float  # 누적 구매 수량
+    dca_total_invested: float  # 누적 투자금액
+    dca_average_price: float  # 평균 단가
+    dca_value: float  # 현재 포트폴리오 가치
+    dca_return: float  # 월별 수익률 (%)
+    dca_cumulative_return: float  # 누적 수익률 (%)
+    dca_mdd: float  # 현재까지의 최대낙폭 (%)
+    
+    def to_dict(self) -> dict:
+        """딕셔너리로 변환"""
+        return {
+            "날짜": self.date,
+            "경과월수": self.month_num,
+            "지수가격": round(self.index_price, 2),
+            
+            # 일시금 투자
+            "일시금_포트폴리오가치": round(self.lump_sum_value, 0),
+            "일시금_월별수익률": round(self.lump_sum_return / 100, 4),  # Excel 퍼센트 포맷용으로 100으로 나누기
+            "일시금_누적수익률": round(self.lump_sum_cumulative_return / 100, 4),
+            "일시금_MDD": round(self.lump_sum_mdd / 100, 4),
+            
+            # 적립식 투자
+            "적립식_월투자금액": round(self.dca_monthly_investment, 0),
+            "적립식_월구매수량": round(self.dca_shares_bought, 4),
+            "적립식_누적수량": round(self.dca_total_shares, 4),
+            "적립식_누적투자금액": round(self.dca_total_invested, 0),
+            "적립식_평균단가": round(self.dca_average_price, 2),
+            "적립식_포트폴리오가치": round(self.dca_value, 0),
+            "적립식_월별수익률": round(self.dca_return / 100, 4),  # Excel 퍼센트 포맷용으로 100으로 나누기
+            "적립식_누적수익률": round(self.dca_cumulative_return / 100, 4),
+            "적립식_MDD": round(self.dca_mdd / 100, 4)
+        }
+
+
 class LumpSumVsDcaAnalyzer:
     """일시투자 vs 적립식투자(DCA) 백테스팅 분석 엔진"""
     
@@ -907,3 +957,489 @@ class LumpSumVsDcaAnalyzer:
     def get_scenarios_data(self) -> List[Dict]:
         """시나리오 데이터 리스트 반환"""
         return [scenario.to_dict() for scenario in self.scenarios]
+    
+    def analyze_detailed_scenario(self, start_date: str, price_data: pd.DataFrame) -> List[MonthlyRecord]:
+        """
+        특정 시작일의 시나리오를 월별로 상세 분석
+        
+        Args:
+            start_date: 투자 시작일 (YYYY-MM-DD 형식)
+            price_data: 지수 가격 데이터
+            
+        Returns:
+            월별 기록 리스트
+        """
+        import pytz
+        
+        # 시작일과 종료일 설정
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+        end_dt = start_dt + relativedelta(years=self.config.analysis_period_years)
+        
+        # 해당 기간의 데이터 추출
+        mask = (price_data.index >= start_dt) & (price_data.index <= end_dt)
+        data = price_data.loc[mask].copy()
+        
+        if len(data) == 0:
+            raise ValueError(f"데이터가 없습니다: {start_date}")
+        
+        # 월별 데이터 추출 (매월 첫 거래일 기준)
+        monthly_data = data.groupby([data.index.year, data.index.month]).first()
+        monthly_data.index = pd.to_datetime([f"{year}-{month:02d}-01" 
+                                           for year, month in monthly_data.index])
+        
+        # 초기 설정
+        start_price = data['Open'].iloc[0]
+        lump_sum_shares = self.config.total_amount / start_price  # 일시금으로 구매한 수량
+        monthly_investment = self.config.total_amount / self.config.investment_period_months
+        
+        # 적립식 투자 변수
+        dca_total_shares = 0.0
+        dca_total_invested = 0.0
+        
+        # MDD 추적용
+        lump_sum_peak = self.config.total_amount
+        dca_peak = 0.0
+        
+        records = []
+        
+        for month_num, (date, row) in enumerate(monthly_data.iterrows()):
+            current_price = row['Close']
+            
+            # === 일시금 투자 계산 ===
+            lump_sum_value = lump_sum_shares * current_price
+            
+            # 일시금 수익률 계산
+            if month_num == 0:
+                lump_sum_return = 0.0
+                lump_sum_cumulative_return = 0.0
+            else:
+                prev_value = records[-1].lump_sum_value
+                lump_sum_return = (lump_sum_value / prev_value - 1) * 100
+                lump_sum_cumulative_return = (lump_sum_value / self.config.total_amount - 1) * 100
+            
+            # 일시금 MDD 계산
+            lump_sum_peak = max(lump_sum_peak, lump_sum_value)
+            lump_sum_mdd = (lump_sum_value / lump_sum_peak - 1) * 100
+            
+            # === 적립식 투자 계산 ===
+            # 이번 달 투자 (투자 기간 동안만)
+            if month_num < self.config.investment_period_months:
+                monthly_investment_amount = monthly_investment
+                shares_bought = monthly_investment_amount / current_price
+                dca_total_shares += shares_bought
+                dca_total_invested += monthly_investment_amount
+            else:
+                monthly_investment_amount = 0.0
+                shares_bought = 0.0
+            
+            # 적립식 포트폴리오 가치
+            dca_value = dca_total_shares * current_price
+            
+            # 적립식 평균 단가
+            dca_average_price = dca_total_invested / dca_total_shares if dca_total_shares > 0 else 0
+            
+            # 적립식 수익률 계산
+            if month_num == 0:
+                dca_return = 0.0
+                dca_cumulative_return = 0.0
+            else:
+                if dca_total_invested > 0:
+                    prev_value = records[-1].dca_value
+                    if prev_value > 0:
+                        dca_return = (dca_value / prev_value - 1) * 100
+                    else:
+                        dca_return = 0.0
+                    dca_cumulative_return = (dca_value / dca_total_invested - 1) * 100
+                else:
+                    dca_return = 0.0
+                    dca_cumulative_return = 0.0
+            
+            # 적립식 MDD 계산
+            if dca_value > 0:
+                dca_peak = max(dca_peak, dca_value)
+                dca_mdd = (dca_value / dca_peak - 1) * 100
+            else:
+                dca_mdd = 0.0
+            
+            # 월별 기록 생성
+            record = MonthlyRecord(
+                date=date.strftime('%Y-%m-%d'),
+                month_num=month_num,
+                index_price=current_price,
+                
+                # 일시금 투자
+                lump_sum_value=lump_sum_value,
+                lump_sum_return=lump_sum_return,
+                lump_sum_cumulative_return=lump_sum_cumulative_return,
+                lump_sum_mdd=lump_sum_mdd,
+                
+                # 적립식 투자
+                dca_monthly_investment=monthly_investment_amount,
+                dca_shares_bought=shares_bought,
+                dca_total_shares=dca_total_shares,
+                dca_total_invested=dca_total_invested,
+                dca_average_price=dca_average_price,
+                dca_value=dca_value,
+                dca_return=dca_return,
+                dca_cumulative_return=dca_cumulative_return,
+                dca_mdd=dca_mdd
+            )
+            
+            records.append(record)
+        
+        return records
+    
+    def export_detailed_analysis_to_excel(self, records: List[MonthlyRecord], 
+                                        start_date: str, 
+                                        output_path: str = "results/lump_sum_vs_dca/") -> str:
+        """
+        월별 상세 분석 결과를 Excel로 출력
+        
+        Args:
+            records: 월별 기록 리스트
+            start_date: 투자 시작일
+            output_path: 출력 경로
+            
+        Returns:
+            생성된 Excel 파일 경로
+        """
+        import os
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        # 출력 디렉토리 생성
+        os.makedirs(output_path, exist_ok=True)
+        
+        # 파일명 생성
+        safe_date = start_date.replace('-', '')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"상세분석_{safe_date}_{timestamp}.xlsx"
+        filepath = os.path.join(output_path, filename)
+        
+        # DataFrame 생성
+        df = pd.DataFrame([record.to_dict() for record in records])
+        
+        # Excel 워크북 생성
+        wb = openpyxl.Workbook()
+        
+        # === 월별 상세 데이터 시트 ===
+        ws_detail = wb.active
+        ws_detail.title = "월별상세데이터"
+        
+        # 헤더 추가
+        headers = list(df.columns)
+        for col, header in enumerate(headers, 1):
+            cell = ws_detail.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 데이터 추가
+        for row_idx, record in enumerate(records, 2):
+            data = record.to_dict()
+            for col_idx, header in enumerate(headers, 1):
+                value = data[header]
+                cell = ws_detail.cell(row=row_idx, column=col_idx, value=value)
+                # 정렬은 나중에 일괄 적용
+        
+        # 컬럼별 서식 정의
+        from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00, FORMAT_NUMBER_COMMA_SEPARATED1
+        
+        column_formats = {}
+        for col_idx, header in enumerate(headers, 1):
+            if header == "날짜":
+                column_formats[col_idx] = "YYYY-MM-DD"
+            elif header == "경과월수":
+                column_formats[col_idx] = "0"
+            elif "가격" in header or "가치" in header or "금액" in header:
+                column_formats[col_idx] = FORMAT_NUMBER_COMMA_SEPARATED1
+            elif "수익률" in header or "MDD" in header:
+                column_formats[col_idx] = FORMAT_PERCENTAGE_00
+            elif "수량" in header or "평균단가" in header:
+                column_formats[col_idx] = "#,##0.0000"
+            else:
+                column_formats[col_idx] = "#,##0.00"
+        
+        # 데이터 행에 서식 적용
+        for row_num in range(2, ws_detail.max_row + 1):
+            for col_num in range(1, ws_detail.max_column + 1):
+                cell = ws_detail.cell(row=row_num, column=col_num)
+                
+                # 포맷 적용
+                if col_num in column_formats:
+                    cell.number_format = column_formats[col_num]
+                
+                # 정렬 설정
+                header = headers[col_num - 1]
+                if header == "날짜":
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif header == "경과월수":
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+        
+        # 열 너비 설정 (데이터 타입에 맞게)
+        column_widths = {
+            "날짜": 12,
+            "경과월수": 8,
+            "지수가격": 12,
+            "일시금_포트폴리오가치": 18,
+            "일시금_월별수익률": 15,
+            "일시금_누적수익률": 15,
+            "일시금_MDD": 12,
+            "적립식_월투자금액": 15,
+            "적립식_월구매수량": 15,
+            "적립식_누적수량": 15,
+            "적립식_누적투자금액": 18,
+            "적립식_평균단가": 15,
+            "적립식_포트폴리오가치": 18,
+            "적립식_월별수익률": 15,
+            "적립식_누적수익률": 15,
+            "적립식_MDD": 12
+        }
+        
+        for col_idx, header in enumerate(headers, 1):
+            width = column_widths.get(header, 15)
+            col_letter = ws_detail.cell(row=1, column=col_idx).column_letter
+            ws_detail.column_dimensions[col_letter].width = width
+        
+        # 머리행 고정 (첫 번째 행 고정)
+        ws_detail.freeze_panes = 'A2'
+        
+        # === 요약 통계 시트 ===
+        ws_summary = wb.create_sheet("요약통계")
+        
+        # 최종 결과 계산
+        final_record = records[-1]
+        
+        summary_data = [
+            ["구분", "일시금투자", "적립식투자"],
+            ["투자 시작일", start_date, start_date],
+            ["총 투자금액", f"${self.config.total_amount:,.0f}", f"${self.config.total_amount:,.0f}"],
+            ["투자 방식", "첫날 일시투자", f"{self.config.investment_period_months}개월 분할투자"],
+            ["", "", ""],
+            ["--- 최종 결과 ---", "", ""],
+            ["최종 포트폴리오 가치", f"${final_record.lump_sum_value:,.0f}", f"${final_record.dca_value:,.0f}"],
+            ["총 수익률", f"{final_record.lump_sum_cumulative_return:.2f}%", f"{final_record.dca_cumulative_return:.2f}%"],
+            ["최대 낙폭 (MDD)", f"{final_record.lump_sum_mdd:.2f}%", f"{final_record.dca_mdd:.2f}%"],
+            ["", "", ""],
+            ["--- 추가 정보 ---", "", ""],
+            ["적립식 평균단가", "-", f"${final_record.dca_average_price:.2f}"],
+            ["적립식 총 구매수량", "-", f"{final_record.dca_total_shares:.4f}"],
+            ["시작일 지수가격", f"${records[0].index_price:.2f}", f"${records[0].index_price:.2f}"],
+            ["종료일 지수가격", f"${final_record.index_price:.2f}", f"${final_record.index_price:.2f}"]
+        ]
+        
+        for row_idx, row_data in enumerate(summary_data, 1):
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws_summary.cell(row=row_idx, column=col_idx, value=value)
+                if row_idx == 1:  # 헤더
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    cell.font = Font(bold=True, color="FFFFFF")
+                elif "---" in str(value):  # 구분선
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 요약통계 시트 데이터 서식 적용
+        from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00, FORMAT_NUMBER_COMMA_SEPARATED1
+        
+        for row_idx, row_data in enumerate(summary_data, 1):
+            if row_idx == 1:  # 헤더 행은 건너뛰기
+                continue
+                
+            for col_idx, value in enumerate(row_data, 1):
+                if col_idx == 1:  # 첫 번째 컬럼 (라벨)은 건너뛰기
+                    continue
+                    
+                cell = ws_summary.cell(row=row_idx, column=col_idx)
+                value_str = str(value)
+                
+                # 값의 성격에 따라 서식 적용
+                import re
+                
+                if "$" in value_str:  # 달러 금액
+                    # 달러 기호 제거하고 숫자만 추출
+                    try:
+                        numeric_value = float(value_str.replace("$", "").replace(",", ""))
+                        cell.value = numeric_value
+                        cell.number_format = '"$"#,##0.00'
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                    except:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif "%" in value_str:  # 퍼센트
+                    try:
+                        numeric_value = float(value_str.replace("%", "")) / 100
+                        cell.value = numeric_value
+                        cell.number_format = FORMAT_PERCENTAGE_00
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                    except:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif re.match(r'^-?\d+\.?\d*$', value_str.replace(",", "")):  # 일반 숫자 (정규식으로 정확히 판단)
+                    try:
+                        numeric_value = float(value_str.replace(",", ""))
+                        cell.value = numeric_value
+                        if "." in value_str:
+                            cell.number_format = "#,##0.0000"
+                        else:
+                            cell.number_format = "#,##0"
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                    except:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif value_str == "-":  # 대시는 가운데 정렬
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                elif "---" in value_str:  # 구분선
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                else:  # 텍스트 (날짜, 투자방식 등)
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 열 너비 조정
+        ws_summary.column_dimensions['A'].width = 25
+        ws_summary.column_dimensions['B'].width = 20
+        ws_summary.column_dimensions['C'].width = 20
+        
+        # 파일 저장
+        wb.save(filepath)
+        
+        return filepath
+    
+    def create_detailed_charts(self, records: List[MonthlyRecord], 
+                             start_date: str,
+                             output_path: str = "results/lump_sum_vs_dca/charts/") -> Tuple[str, str]:
+        """
+        월별 수익률 및 MDD 변화 차트 생성
+        
+        Args:
+            records: 월별 기록 리스트
+            start_date: 투자 시작일
+            output_path: 차트 저장 경로
+            
+        Returns:
+            (수익률 차트 경로, MDD 차트 경로)
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        import matplotlib.font_manager as fm
+        import os
+        
+        # 출력 디렉토리 생성
+        os.makedirs(output_path, exist_ok=True)
+        
+        # 한글 폰트 설정 (기존 charts.py와 동일)
+        # 폰트 캐시 클리어
+        fm._get_fontconfig_fonts.cache_clear()
+        
+        # 시스템 폰트 재로드
+        fm.fontManager.__init__()
+        
+        # 사용 가능한 한글 폰트 찾기
+        korean_fonts = [f.name for f in fm.fontManager.ttflist if 'CJK' in f.name or 'Nanum' in f.name]
+        
+        if korean_fonts:
+            font_name = korean_fonts[0]
+            plt.rcParams['font.family'] = font_name
+            # 모든 텍스트 요소에 한글 폰트 적용
+            plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+            plt.rcParams['font.monospace'] = [font_name] + plt.rcParams['font.monospace']
+            plt.rcParams['font.serif'] = [font_name] + plt.rcParams['font.serif']
+            print(f"한글 폰트 설정: {font_name}")
+        else:
+            # 직접 폰트 파일 경로 지정
+            font_path = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+            if os.path.exists(font_path):
+                prop = fm.FontProperties(fname=font_path)
+                font_name = prop.get_name()
+                plt.rcParams['font.family'] = font_name
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                plt.rcParams['font.monospace'] = [font_name] + plt.rcParams['font.monospace']
+                plt.rcParams['font.serif'] = [font_name] + plt.rcParams['font.serif']
+                print(f"폰트 파일 직접 로드: {font_path}")
+            else:
+                plt.rcParams['font.family'] = 'DejaVu Sans'
+                print("한글 폰트 없음, DejaVu Sans 사용")
+        
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 데이터 준비
+        dates = [datetime.strptime(record.date, '%Y-%m-%d') for record in records]
+        lump_sum_returns = [record.lump_sum_cumulative_return for record in records]
+        dca_returns = [record.dca_cumulative_return for record in records]
+        lump_sum_mdds = [record.lump_sum_mdd for record in records]
+        dca_mdds = [record.dca_mdd for record in records]
+        
+        # === 수익률 변화 차트 ===
+        plt.figure(figsize=(16, 10))
+        
+        plt.plot(dates, lump_sum_returns, linewidth=2.5, color='#2E86AB', 
+                label='일시금투자 누적수익률', marker='o', markersize=3)
+        plt.plot(dates, dca_returns, linewidth=2.5, color='#F24236', 
+                label='적립식투자 누적수익률', marker='s', markersize=3)
+        
+        # 0% 기준선
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
+        
+        # 축 설정
+        plt.xlabel('날짜', fontsize=12)
+        plt.ylabel('누적 수익률 (%)', fontsize=12)
+        plt.title(f'월별 누적수익률 변화 추이 - {start_date} 시작', fontsize=16, fontweight='bold', pad=20)
+        
+        # X축 포맷팅
+        plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        plt.gca().xaxis.set_minor_locator(mdates.MonthLocator([1, 7]))
+        
+        # 범례 및 그리드
+        plt.legend(fontsize=12, loc='upper left')
+        plt.grid(True, alpha=0.3)
+        
+        # 레이아웃 조정
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # 수익률 차트 저장
+        safe_date = start_date.replace('-', '')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        returns_chart_path = os.path.join(output_path, f"상세분석_수익률변화_{safe_date}_{timestamp}.png")
+        plt.savefig(returns_chart_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # === MDD 변화 차트 ===
+        plt.figure(figsize=(16, 10))
+        
+        plt.plot(dates, lump_sum_mdds, linewidth=2.5, color='#2E86AB', 
+                label='일시금투자 MDD', marker='o', markersize=3)
+        plt.plot(dates, dca_mdds, linewidth=2.5, color='#F24236', 
+                label='적립식투자 MDD', marker='s', markersize=3)
+        
+        # 0% 기준선
+        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
+        
+        # 축 설정
+        plt.xlabel('날짜', fontsize=12)
+        plt.ylabel('최대낙폭 MDD (%)', fontsize=12)
+        plt.title(f'월별 최대낙폭(MDD) 변화 추이 - {start_date} 시작', fontsize=16, fontweight='bold', pad=20)
+        
+        # Y축을 음수 방향으로 (MDD는 보통 음수)
+        y_min = min(min(lump_sum_mdds), min(dca_mdds)) - 5
+        plt.ylim(y_min, 5)
+        
+        # X축 포맷팅
+        plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        plt.gca().xaxis.set_minor_locator(mdates.MonthLocator([1, 7]))
+        
+        # 범례 및 그리드
+        plt.legend(fontsize=12, loc='lower left')
+        plt.grid(True, alpha=0.3)
+        
+        # 레이아웃 조정
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # MDD 차트 저장
+        mdd_chart_path = os.path.join(output_path, f"상세분석_MDD변화_{safe_date}_{timestamp}.png")
+        plt.savefig(mdd_chart_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return returns_chart_path, mdd_chart_path
