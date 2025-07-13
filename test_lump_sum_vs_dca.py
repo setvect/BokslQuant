@@ -33,7 +33,8 @@ def main():
         total_amount=60000,  # 총 6만달러
         investment_period_months=60,  # 5년간 적립
         analysis_period_years=10,  # 10년 후 성과 측정
-        start_year=1972,
+        # start_year=1972,
+        start_year=2000,
         start_month=1,
         end_year=2015,
         end_month=1
@@ -207,6 +208,10 @@ def quick_analysis():
     if analyzer.scenarios:
         stats = analyzer.get_summary_statistics()
         print_summary_statistics(stats)
+        
+        # Excel 저장 추가
+        excel_path = analyzer.export_to_excel()
+        print(f"✅ Excel 저장: {excel_path}")
         
         # 간단한 차트만 생성
         visualizer = LumpSumVsDcaVisualizer()

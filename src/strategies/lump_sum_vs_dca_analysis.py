@@ -62,8 +62,10 @@ class ScenarioResult:
             "적립식투자_MDD": round(self.dca_mdd, 2),
             "일시투자_샤프지수": round(self.lump_sum_sharpe, 3),
             "적립식투자_샤프지수": round(self.dca_sharpe, 3),
-            "적립식_평단가": round(self.dca_avg_price, 2),
-            "적립식_총구매수량": round(self.dca_total_shares, 2),
+            "평균_단가": round(self.dca_avg_price, 2),
+            "평균_구매수량": round(self.dca_total_shares, 2),
+            "일시금_평균단가": round(self.start_price, 2),
+            "일시금_구매수량": round(60000 / self.start_price, 4),
             "시작일_지수가격": round(self.start_price, 2),
             "측정일_지수가격": round(self.end_price, 2)
         }
@@ -121,6 +123,25 @@ class MonthlyRecord:
 
 class LumpSumVsDcaAnalyzer:
     """일시투자 vs 적립식투자(DCA) 백테스팅 분석 엔진"""
+    
+    # 색상 테마 정의
+    COLORS = {
+        'lump_sum': {
+            'primary': '2E86AB',      # 진한 파란색 (일시투자)
+            'light': 'A8DADC',        # 연한 파란색
+            'chart': '#2E86AB'        # 차트용 (# 포함)
+        },
+        'dca': {
+            'primary': 'F24236',      # 진한 빨간색 (적립투자) 
+            'light': 'F1FAEE',        # 연한 빨간색
+            'chart': '#F24236'        # 차트용 (# 포함)
+        },
+        'neutral': {
+            'header': '366092',       # 기본 헤더
+            'light_gray': 'F8F9FA',   # 연한 회색
+            'border': 'E9ECEF'        # 테두리
+        }
+    }
     
     def __init__(self, config: ScenarioConfig):
         self.config = config
@@ -379,6 +400,10 @@ class LumpSumVsDcaAnalyzer:
         dca_returns = [s.dca_return for s in self.scenarios]
         return_differences = [s.return_difference for s in self.scenarios]
         
+        # MDD 데이터 추가
+        lump_sum_mdds = [s.lump_sum_mdd for s in self.scenarios]
+        dca_mdds = [s.dca_mdd for s in self.scenarios]
+        
         # 통계 계산
         stats = {
             "기본_통계": {
@@ -402,6 +427,12 @@ class LumpSumVsDcaAnalyzer:
                 "적립식투자_최저수익률": round(min(dca_returns), 2),
                 "최대_수익률차이": round(max(return_differences), 2),
                 "최소_수익률차이": round(min(return_differences), 2)
+            },
+            "MDD_통계": {
+                "일시투자_평균MDD": round(np.mean(lump_sum_mdds), 2),
+                "적립식투자_평균MDD": round(np.mean(dca_mdds), 2),
+                "일시투자_최대MDD": round(min(lump_sum_mdds), 2),
+                "적립식투자_최대MDD": round(min(dca_mdds), 2)
             }
         }
         
@@ -548,7 +579,12 @@ class LumpSumVsDcaAnalyzer:
             ['', '적립식투자 최고수익률', f"{extreme_stats.get('적립식투자_최고수익률', 0)}%"],
             ['', '적립식투자 최저수익률', f"{extreme_stats.get('적립식투자_최저수익률', 0)}%"],
             ['', '최대 수익률 차이', f"{extreme_stats.get('최대_수익률차이', 0)}%p"],
-            ['', '최소 수익률 차이', f"{extreme_stats.get('최소_수익률차이', 0)}%p"]
+            ['', '최소 수익률 차이', f"{extreme_stats.get('최소_수익률차이', 0)}%p"],
+            ['', '', ''],
+            ['위험 분석', '일시투자 평균 MDD', f"{stats.get('MDD_통계', {}).get('일시투자_평균MDD', 0)}%"],
+            ['', '적립식투자 평균 MDD', f"{stats.get('MDD_통계', {}).get('적립식투자_평균MDD', 0)}%"],
+            ['', '일시투자 최대 MDD', f"{stats.get('MDD_통계', {}).get('일시투자_최대MDD', 0)}%"],
+            ['', '적립식투자 최대 MDD', f"{stats.get('MDD_통계', {}).get('적립식투자_최대MDD', 0)}%"]
         ])
         
         # DataFrame으로 변환 후 저장
@@ -605,8 +641,9 @@ class LumpSumVsDcaAnalyzer:
         ])
         
         # MDD 분석
-        ls_mdd_avg = df['일시투자_MDD'].mean()
-        dca_mdd_avg = df['적립식투자_MDD'].mean()
+        mdd_stats = stats.get('MDD_통계', {})
+        ls_mdd_avg = mdd_stats.get('일시투자_평균MDD', 0)
+        dca_mdd_avg = mdd_stats.get('적립식투자_평균MDD', 0)
         
         analysis_data.extend([
             ['[위험] 최대낙폭(MDD) 비교'],
@@ -745,13 +782,26 @@ class LumpSumVsDcaAnalyzer:
         
         # 헤더 스타일
         header_font = Font(bold=True, color='FFFFFF', size=11)
-        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
         header_alignment = Alignment(horizontal='center', vertical='center')
         
-        # 헤더 행 서식 적용
-        for cell in ws[1]:
+        # 헤더 행 서식 적용 (컬럼별 색상 구분)
+        for col_idx, cell in enumerate(ws[1], 1):
+            header_text = str(cell.value or '')
+            
+            # 일시투자 관련 컬럼은 파란색
+            if any(keyword in header_text for keyword in ['일시투자', '일시금']):
+                cell.fill = PatternFill(start_color=self.COLORS['lump_sum']['primary'], 
+                                      end_color=self.COLORS['lump_sum']['primary'], fill_type='solid')
+            # 적립식투자 관련 컬럼은 빨간색
+            elif any(keyword in header_text for keyword in ['적립식투자', '적립투자', '적립식', '평균_단가', '평균_구매수량']):
+                cell.fill = PatternFill(start_color=self.COLORS['dca']['primary'], 
+                                      end_color=self.COLORS['dca']['primary'], fill_type='solid')
+            # 기타 컬럼은 기본 색상
+            else:
+                cell.fill = PatternFill(start_color=self.COLORS['neutral']['header'], 
+                                      end_color=self.COLORS['neutral']['header'], fill_type='solid')
+            
             cell.font = header_font
-            cell.fill = header_fill
             cell.alignment = header_alignment
         
         # 머릿말 행 고정
@@ -773,10 +823,12 @@ class LumpSumVsDcaAnalyzer:
             'L': FORMAT_PERCENTAGE_00,  # 적립식투자_MDD
             'M': '#,##0.000',  # 일시투자_샤프지수
             'N': '#,##0.000',  # 적립식투자_샤프지수
-            'O': FORMAT_NUMBER_COMMA_SEPARATED1,  # 적립식_평단가
-            'P': '#,##0.00',  # 적립식_총구매수량
-            'Q': FORMAT_NUMBER_COMMA_SEPARATED1,  # 시작일_지수가격
-            'R': FORMAT_NUMBER_COMMA_SEPARATED1,  # 측정일_지수가격
+            'O': FORMAT_NUMBER_COMMA_SEPARATED1,  # 평균_단가 
+            'P': '#,##0.0000',  # 평균_구매수량
+            'Q': FORMAT_NUMBER_COMMA_SEPARATED1,  # 일시금_평균단가
+            'R': '#,##0.0000',  # 일시금_구매수량
+            'S': FORMAT_NUMBER_COMMA_SEPARATED1,  # 시작일_지수가격
+            'T': FORMAT_NUMBER_COMMA_SEPARATED1,  # 측정일_지수가격
         }
         
         # 데이터 행에 서식 적용
@@ -806,10 +858,12 @@ class LumpSumVsDcaAnalyzer:
             'L': 14,  # 적립식투자_MDD
             'M': 16,  # 일시투자_샤프지수
             'N': 16,  # 적립식투자_샤프지수
-            'O': 14,  # 적립식_평단가
-            'P': 16,  # 적립식_총구매수량
-            'Q': 16,  # 시작일_지수가격
-            'R': 16,  # 측정일_지수가격
+            'O': 14,  # 평균_단가
+            'P': 16,  # 평균_구매수량
+            'Q': 16,  # 일시금_평균단가
+            'R': 16,  # 일시금_구매수량
+            'S': 16,  # 시작일_지수가격
+            'T': 16,  # 측정일_지수가격
         }
         
         for col_letter, width in column_widths.items():
@@ -884,13 +938,30 @@ class LumpSumVsDcaAnalyzer:
         
         # 헤더 스타일
         header_font = Font(bold=True, color='FFFFFF', size=11)
-        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center')
         
-        # 헤더 행 서식
-        for cell in ws[1]:
+        # 헤더 행 서식 적용 (컬럼별 색상 구분)
+        for col_idx, cell in enumerate(ws[1], 1):
+            header_text = str(cell.value or '')
+            
+            # 일시투자 관련 컬럼은 파란색
+            if any(keyword in header_text for keyword in ['일시투자', '일시금']):
+                cell.fill = PatternFill(start_color=self.COLORS['lump_sum']['primary'], 
+                                      end_color=self.COLORS['lump_sum']['primary'], fill_type='solid')
+            # 적립식투자 관련 컬럼은 빨간색
+            elif any(keyword in header_text for keyword in ['적립식투자', '적립투자', '적립식']):
+                cell.fill = PatternFill(start_color=self.COLORS['dca']['primary'], 
+                                      end_color=self.COLORS['dca']['primary'], fill_type='solid')
+            # 기타 컬럼은 기본 색상
+            else:
+                cell.fill = PatternFill(start_color=self.COLORS['neutral']['header'], 
+                                      end_color=self.COLORS['neutral']['header'], fill_type='solid')
+            
             cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.alignment = header_alignment
+        
+        # 머릿말 행 고정
+        ws.freeze_panes = 'A2'
         
         # 컬럼별 포맷 정의 (새로운 구조에 맞게)
         column_formats = {}
@@ -1019,7 +1090,7 @@ class LumpSumVsDcaAnalyzer:
             
             # 일시금 MDD 계산
             lump_sum_peak = max(lump_sum_peak, lump_sum_value)
-            lump_sum_mdd = (lump_sum_value / lump_sum_peak - 1) * 100
+            lump_sum_mdd = min(0, (lump_sum_value / lump_sum_peak - 1) * 100)
             
             # === 적립식 투자 계산 ===
             # 이번 달 투자 (투자 기간 동안만)
@@ -1057,7 +1128,7 @@ class LumpSumVsDcaAnalyzer:
             # 적립식 MDD 계산
             if dca_value > 0:
                 dca_peak = max(dca_peak, dca_value)
-                dca_mdd = (dca_value / dca_peak - 1) * 100
+                dca_mdd = min(0, (dca_value / dca_peak - 1) * 100)
             else:
                 dca_mdd = 0.0
             
@@ -1126,12 +1197,23 @@ class LumpSumVsDcaAnalyzer:
         ws_detail = wb.active
         ws_detail.title = "월별상세데이터"
         
-        # 헤더 추가
+        # 헤더 추가 (색상 구분)
         headers = list(df.columns)
         for col, header in enumerate(headers, 1):
             cell = ws_detail.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            
+            # 헤더별 색상 구분
+            if any(keyword in header for keyword in ['일시금', '일시투자']):
+                cell.fill = PatternFill(start_color=self.COLORS['lump_sum']['primary'], 
+                                      end_color=self.COLORS['lump_sum']['primary'], fill_type="solid")
+            elif any(keyword in header for keyword in ['적립식', '적립투자']):
+                cell.fill = PatternFill(start_color=self.COLORS['dca']['primary'], 
+                                      end_color=self.COLORS['dca']['primary'], fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color=self.COLORS['neutral']['header'], 
+                                      end_color=self.COLORS['neutral']['header'], fill_type="solid")
+            
             cell.alignment = Alignment(horizontal="center", vertical="center")
         
         # 데이터 추가
@@ -1212,6 +1294,10 @@ class LumpSumVsDcaAnalyzer:
         # 최종 결과 계산
         final_record = records[-1]
         
+        # 전체 기간 중 최악의 MDD 계산
+        worst_lump_sum_mdd = min(record.lump_sum_mdd for record in records)
+        worst_dca_mdd = min(record.dca_mdd for record in records)
+        
         summary_data = [
             ["구분", "일시금투자", "적립식투자"],
             ["투자 시작일", start_date, start_date],
@@ -1221,11 +1307,11 @@ class LumpSumVsDcaAnalyzer:
             ["--- 최종 결과 ---", "", ""],
             ["최종 포트폴리오 가치", f"${final_record.lump_sum_value:,.0f}", f"${final_record.dca_value:,.0f}"],
             ["총 수익률", f"{final_record.lump_sum_cumulative_return:.2f}%", f"{final_record.dca_cumulative_return:.2f}%"],
-            ["최대 낙폭 (MDD)", f"{final_record.lump_sum_mdd:.2f}%", f"{final_record.dca_mdd:.2f}%"],
+            ["최대 낙폭 (MDD)", f"{worst_lump_sum_mdd:.2f}%", f"{worst_dca_mdd:.2f}%"],
             ["", "", ""],
             ["--- 추가 정보 ---", "", ""],
-            ["적립식 평균단가", "-", f"${final_record.dca_average_price:.2f}"],
-            ["적립식 총 구매수량", "-", f"{final_record.dca_total_shares:.4f}"],
+            ["평균 단가", f"${records[0].index_price:.2f}", f"${final_record.dca_average_price:.2f}"],
+            ["평균 구매수량", f"{self.config.total_amount / records[0].index_price:.4f}", f"{final_record.dca_total_shares:.4f}"],
             ["시작일 지수가격", f"${records[0].index_price:.2f}", f"${records[0].index_price:.2f}"],
             ["종료일 지수가격", f"${final_record.index_price:.2f}", f"${final_record.index_price:.2f}"]
         ]
@@ -1234,8 +1320,15 @@ class LumpSumVsDcaAnalyzer:
             for col_idx, value in enumerate(row_data, 1):
                 cell = ws_summary.cell(row=row_idx, column=col_idx, value=value)
                 if row_idx == 1:  # 헤더
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    if col_idx == 2:  # 일시금투자 컬럼
+                        cell.fill = PatternFill(start_color=self.COLORS['lump_sum']['primary'], 
+                                              end_color=self.COLORS['lump_sum']['primary'], fill_type="solid")
+                    elif col_idx == 3:  # 적립식투자 컬럼
+                        cell.fill = PatternFill(start_color=self.COLORS['dca']['primary'], 
+                                              end_color=self.COLORS['dca']['primary'], fill_type="solid")
+                    else:  # 기본 컬럼
+                        cell.fill = PatternFill(start_color=self.COLORS['neutral']['header'], 
+                                              end_color=self.COLORS['neutral']['header'], fill_type="solid")
                     cell.font = Font(bold=True, color="FFFFFF")
                 elif "---" in str(value):  # 구분선
                     cell.font = Font(bold=True)
@@ -1371,9 +1464,9 @@ class LumpSumVsDcaAnalyzer:
         # === 수익률 변화 차트 ===
         plt.figure(figsize=(16, 10))
         
-        plt.plot(dates, lump_sum_returns, linewidth=2.5, color='#2E86AB', 
+        plt.plot(dates, lump_sum_returns, linewidth=2.5, color=self.COLORS['lump_sum']['chart'], 
                 label='일시금투자 누적수익률', marker='o', markersize=3)
-        plt.plot(dates, dca_returns, linewidth=2.5, color='#F24236', 
+        plt.plot(dates, dca_returns, linewidth=2.5, color=self.COLORS['dca']['chart'], 
                 label='적립식투자 누적수익률', marker='s', markersize=3)
         
         # 0% 기준선
@@ -1407,9 +1500,9 @@ class LumpSumVsDcaAnalyzer:
         # === MDD 변화 차트 ===
         plt.figure(figsize=(16, 10))
         
-        plt.plot(dates, lump_sum_mdds, linewidth=2.5, color='#2E86AB', 
+        plt.plot(dates, lump_sum_mdds, linewidth=2.5, color=self.COLORS['lump_sum']['chart'], 
                 label='일시금투자 MDD', marker='o', markersize=3)
-        plt.plot(dates, dca_mdds, linewidth=2.5, color='#F24236', 
+        plt.plot(dates, dca_mdds, linewidth=2.5, color=self.COLORS['dca']['chart'], 
                 label='적립식투자 MDD', marker='s', markersize=3)
         
         # 0% 기준선
