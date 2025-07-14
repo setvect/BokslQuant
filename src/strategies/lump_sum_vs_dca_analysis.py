@@ -1461,7 +1461,7 @@ class LumpSumVsDcaAnalyzer:
                           start_date: datetime, 
                           end_date: datetime) -> Tuple[List[datetime], List[float], List[float]]:
         """
-        일별 MDD 계산
+        일별 MDD 계산 (수익률 기반)
         
         Args:
             price_data: 가격 데이터
@@ -1494,14 +1494,13 @@ class LumpSumVsDcaAnalyzer:
         lump_sum_mdds = []
         dca_mdds = []
         
-        # 일시투자 초기값
-        lump_sum_shares = total_amount / initial_price
-        lump_sum_peak = lump_sum_shares * initial_price  # 초기 포트폴리오 가치
+        # 일시투자 수익률 계산용 변수
+        lump_sum_cumulative_max_return = 0.0
         
-        # 적립투자 초기값  
+        # 적립투자 계산용 변수  
         dca_total_shares = 0
         dca_total_invested = 0
-        dca_peak = 0
+        dca_cumulative_max_return = 0.0
         
         # 투자 기간 (월 단위를 일 단위로 변환)
         investment_end_date = start_date + pd.DateOffset(months=self.config.investment_period_months)
@@ -1512,14 +1511,19 @@ class LumpSumVsDcaAnalyzer:
             close_price = row['Close']
             low_price = row['Low']
             
-            # === 일시투자 MDD 계산 ===
-            # Close 가격으로 peak 업데이트, Low 가격으로 MDD 계산
-            lump_sum_close_value = lump_sum_shares * close_price
-            lump_sum_low_value = lump_sum_shares * low_price
-            lump_sum_peak = max(lump_sum_peak, lump_sum_close_value)
-            lump_sum_mdd = min(0, (lump_sum_low_value / lump_sum_peak - 1) * 100)
+            # === 일시투자 MDD 계산 (수익률 기반) ===
+            # Close 가격 기준 수익률 계산
+            lump_sum_close_return = (close_price / initial_price - 1) * 100
+            # Low 가격 기준 수익률 계산 (일중 최저점)
+            lump_sum_low_return = (low_price / initial_price - 1) * 100
             
-            # === 적립투자 MDD 계산 ===
+            # 누적 최대 수익률 업데이트 (Close 기준)
+            lump_sum_cumulative_max_return = max(lump_sum_cumulative_max_return, lump_sum_close_return)
+            
+            # MDD 계산 (Low 기준으로 최대 낙폭 계산)
+            lump_sum_mdd = min(0, lump_sum_low_return - lump_sum_cumulative_max_return)
+            
+            # === 적립투자 MDD 계산 (수익률 기반) ===
             # 매월 1일에 투자 (해당 월의 첫 거래일)
             if date <= investment_end_date:
                 # 월 첫날인지 확인
@@ -1528,13 +1532,21 @@ class LumpSumVsDcaAnalyzer:
                     dca_total_shares += shares_to_buy
                     dca_total_invested += monthly_investment
             
-            # 적립투자 포트폴리오 가치
-            if dca_total_shares > 0:
-                # Close 가격으로 peak 업데이트, Low 가격으로 MDD 계산
+            # 적립투자 수익률 계산
+            if dca_total_shares > 0 and dca_total_invested > 0:
+                # Close 가격 기준 수익률
                 dca_close_value = dca_total_shares * close_price
+                dca_close_return = (dca_close_value / dca_total_invested - 1) * 100
+                
+                # Low 가격 기준 수익률 (일중 최저점)
                 dca_low_value = dca_total_shares * low_price
-                dca_peak = max(dca_peak, dca_close_value)
-                dca_mdd = min(0, (dca_low_value / dca_peak - 1) * 100)
+                dca_low_return = (dca_low_value / dca_total_invested - 1) * 100
+                
+                # 누적 최대 수익률 업데이트 (Close 기준)
+                dca_cumulative_max_return = max(dca_cumulative_max_return, dca_close_return)
+                
+                # MDD 계산 (Low 기준으로 최대 낙폭 계산)
+                dca_mdd = min(0, dca_low_return - dca_cumulative_max_return)
             else:
                 dca_mdd = 0.0
             
@@ -1609,27 +1621,11 @@ class LumpSumVsDcaAnalyzer:
         lump_sum_returns = [record.lump_sum_cumulative_return for record in records]
         dca_returns = [record.dca_cumulative_return for record in records]
         
-        # Excel과 동일한 수익률 기반 MDD 계산
-        lump_sum_mdds = []
-        dca_mdds = []
-        
-        # 수익률 기반 MDD 계산 (Excel과 동일)
-        lump_sum_peak_return = 0.0
-        dca_peak_return = 0.0
-        
-        for record in records:
-            # 일시금 누적 최대 수익률 및 MDD 계산
-            current_lump_return = record.lump_sum_cumulative_return
-            lump_sum_peak_return = max(lump_sum_peak_return, current_lump_return)
-            lump_mdd = current_lump_return - lump_sum_peak_return
-            lump_sum_mdds.append(lump_mdd)
-            
-            # 적립식 누적 최대 수익률 및 MDD 계산  
-            current_dca_return = record.dca_cumulative_return
-            if current_dca_return != 0:  # 투자가 시작된 후부터
-                dca_peak_return = max(dca_peak_return, current_dca_return)
-            dca_mdd = current_dca_return - dca_peak_return
-            dca_mdds.append(dca_mdd)
+        # 일별 MDD 계산 (정확한 MDD 측정)
+        start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+        end_datetime = start_datetime + pd.DateOffset(years=self.config.analysis_period_years)
+        daily_dates, daily_lump_sum_mdds, daily_dca_mdds = self.calculate_daily_mdd(
+            price_data, start_datetime, end_datetime)
         
         # === 수익률 변화 차트 ===
         plt.figure(figsize=(16, 10))
@@ -1667,44 +1663,56 @@ class LumpSumVsDcaAnalyzer:
         plt.savefig(returns_chart_path, dpi=300, bbox_inches='tight')
         plt.close()
         
-        # === MDD 변화 차트 ===
-        plt.figure(figsize=(16, 10))
-        
-        # 선 스타일과 투명도를 다르게 하여 겹치는 것을 방지
-        plt.plot(monthly_dates, lump_sum_mdds, linewidth=2.5, color=self.COLORS['lump_sum']['chart'], 
-                label='일시금투자 MDD', marker='o', markersize=2, alpha=0.9)
-        plt.plot(monthly_dates, dca_mdds, linewidth=2.0, color=self.COLORS['dca']['chart'], 
-                label='적립식투자 MDD', marker='s', markersize=2, alpha=0.8, linestyle='--')
-        
-        # 0% 기준선
-        plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
-        
-        # 축 설정
-        plt.xlabel('날짜', fontsize=12)
-        plt.ylabel('최대낙폭 MDD (%)', fontsize=12)
-        plt.title(f'월별 최대낙폭(MDD) 변화 추이 - {start_date} 시작', fontsize=16, fontweight='bold', pad=20)
-        
-        # Y축을 음수 방향으로 (MDD는 보통 음수)
-        if lump_sum_mdds and dca_mdds:
-            y_min = min(min(lump_sum_mdds), min(dca_mdds)) - 5
+        # === MDD 변화 차트 (일별 데이터 사용) ===
+        if daily_dates and daily_lump_sum_mdds and daily_dca_mdds:
+            plt.figure(figsize=(16, 10))
+            
+            # 일별 MDD 데이터 플롯 (마커 없이 선만)
+            plt.plot(daily_dates, daily_lump_sum_mdds, linewidth=1.5, color=self.COLORS['lump_sum']['chart'], 
+                    label='일시금투자 MDD', alpha=0.9)
+            plt.plot(daily_dates, daily_dca_mdds, linewidth=1.5, color=self.COLORS['dca']['chart'], 
+                    label='적립식투자 MDD', alpha=0.8, linestyle='--')
+            
+            # 0% 기준선
+            plt.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
+            
+            # 축 설정
+            plt.xlabel('날짜', fontsize=12)
+            plt.ylabel('최대낙폭 MDD (%)', fontsize=12)
+            plt.title(f'일별 최대낙폭(MDD) 변화 추이 - {start_date} 시작', fontsize=16, fontweight='bold', pad=20)
+            
+            # Y축을 음수 방향으로 (MDD는 보통 음수)
+            y_min = min(min(daily_lump_sum_mdds), min(daily_dca_mdds)) - 5
             plt.ylim(y_min, 5)
-        
-        # X축 포맷팅
-        plt.gca().xaxis.set_major_locator(mdates.YearLocator())
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-        plt.gca().xaxis.set_minor_locator(mdates.MonthLocator([1, 7]))
-        
-        # 범례 및 그리드
-        plt.legend(fontsize=12, loc='lower left')
-        plt.grid(True, alpha=0.3)
-        
-        # 레이아웃 조정
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        # MDD 차트 저장
-        mdd_chart_path = os.path.join(output_path, f"상세분석_MDD변화_{safe_date}_{timestamp}.png")
-        plt.savefig(mdd_chart_path, dpi=300, bbox_inches='tight')
-        plt.close()
+            
+            # X축 포맷팅
+            plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            plt.gca().xaxis.set_minor_locator(mdates.MonthLocator([1, 7]))
+            
+            # 범례 및 그리드
+            plt.legend(fontsize=12, loc='lower left')
+            plt.grid(True, alpha=0.3)
+            
+            # 레이아웃 조정
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            
+            # MDD 차트 저장
+            mdd_chart_path = os.path.join(output_path, f"상세분석_MDD변화_{safe_date}_{timestamp}.png")
+            plt.savefig(mdd_chart_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            # 일별 데이터가 없는 경우 빈 차트 생성
+            plt.figure(figsize=(16, 10))
+            plt.text(0.5, 0.5, '일별 MDD 데이터를 계산할 수 없습니다.', 
+                    horizontalalignment='center', verticalalignment='center',
+                    transform=plt.gca().transAxes, fontsize=16)
+            plt.title(f'일별 최대낙폭(MDD) 변화 추이 - {start_date} 시작', fontsize=16, fontweight='bold', pad=20)
+            
+            # MDD 차트 저장
+            mdd_chart_path = os.path.join(output_path, f"상세분석_MDD변화_{safe_date}_{timestamp}.png")
+            plt.savefig(mdd_chart_path, dpi=300, bbox_inches='tight')
+            plt.close()
         
         return returns_chart_path, mdd_chart_path
