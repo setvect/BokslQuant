@@ -242,11 +242,27 @@ class LumpSumVsDcaAnalyzer:
         portfolio_values = data['Close'] * shares
         daily_returns = portfolio_values.pct_change().dropna()
         
-        # MDD 계산
-        cumulative_returns = portfolio_values / portfolio_values.iloc[0]
-        rolling_max = cumulative_returns.expanding().max()
-        drawdown = (cumulative_returns - rolling_max) / rolling_max * 100
-        mdd = drawdown.min()
+        # MDD 계산 (Low 가격 활용)
+        if 'Low' in data.columns:
+            # Low 가격 기준 포트폴리오 가치 계산
+            low_portfolio_values = data['Low'] * shares
+            # Close 가격 기준 누적 수익률 계산
+            close_returns = (data['Close'] / data['Close'].iloc[0] - 1) * 100
+            # Low 가격 기준 수익률 계산 (일중 최저점)
+            low_returns = (data['Low'] / data['Close'].iloc[0] - 1) * 100
+            
+            # 누적 최대 수익률 계산 (Close 기준)
+            cumulative_max_return = close_returns.expanding().max()
+            
+            # MDD 계산 (Low 기준으로 최대 낙폭 계산)
+            drawdown = low_returns - cumulative_max_return
+            mdd = drawdown.min()
+        else:
+            # Low 가격이 없는 경우 기존 방식 사용
+            cumulative_returns = portfolio_values / portfolio_values.iloc[0]
+            rolling_max = cumulative_returns.expanding().max()
+            drawdown = (cumulative_returns - rolling_max) / rolling_max * 100
+            mdd = drawdown.min()
         
         # 샤프지수 계산
         if len(daily_returns) > 0 and daily_returns.std() > 0:
@@ -330,11 +346,26 @@ class LumpSumVsDcaAnalyzer:
                         month_tracker += 1
                 invested_series.iloc[i] = invested_amount if invested_amount > 0 else investment_records[0]['amount']
             
-            # MDD 계산 (투자원금 대비)
-            returns_ratio = portfolio_values / invested_series
-            rolling_max = returns_ratio.expanding().max()
-            drawdown = (returns_ratio - rolling_max) / rolling_max * 100
-            mdd = drawdown.min()
+            # MDD 계산 (Low 가격 활용)
+            if 'Low' in data.columns:
+                # Close 가격 기준 수익률 계산
+                close_returns = (portfolio_values / invested_series - 1) * 100
+                # Low 가격 기준 수익률 계산 (일중 최저점)
+                low_portfolio_values = data['Low'] * (portfolio_values / data['Close'])
+                low_returns = (low_portfolio_values / invested_series - 1) * 100
+                
+                # 누적 최대 수익률 계산 (Close 기준)
+                cumulative_max_return = close_returns.expanding().max()
+                
+                # MDD 계산 (Low 기준으로 최대 낙폭 계산)
+                drawdown = low_returns - cumulative_max_return
+                mdd = drawdown.min()
+            else:
+                # Low 가격이 없는 경우 기존 방식 사용
+                returns_ratio = portfolio_values / invested_series
+                rolling_max = returns_ratio.expanding().max()
+                drawdown = (returns_ratio - rolling_max) / rolling_max * 100
+                mdd = drawdown.min()
             
             # 일별 수익률 계산
             daily_returns = portfolio_values.pct_change().dropna()
@@ -1070,9 +1101,9 @@ class LumpSumVsDcaAnalyzer:
         dca_total_shares = 0.0
         dca_total_invested = 0.0
         
-        # MDD 추적용
-        lump_sum_peak = self.config.total_amount
-        dca_peak = 0.0
+        # MDD 추적용 (수익률 기반)
+        lump_sum_peak_return = 0.0
+        dca_peak_return = 0.0
         
         records = []
         
@@ -1091,9 +1122,9 @@ class LumpSumVsDcaAnalyzer:
                 lump_sum_return = (lump_sum_value / prev_value - 1) * 100
                 lump_sum_cumulative_return = (lump_sum_value / self.config.total_amount - 1) * 100
             
-            # 일시금 MDD 계산
-            lump_sum_peak = max(lump_sum_peak, lump_sum_value)
-            lump_sum_mdd = min(0, (lump_sum_value / lump_sum_peak - 1) * 100)
+            # 일시금 MDD 계산 (수익률 기반)
+            lump_sum_peak_return = max(lump_sum_peak_return, lump_sum_cumulative_return)
+            lump_sum_mdd = min(0, lump_sum_cumulative_return - lump_sum_peak_return)
             
             # === 적립식 투자 계산 ===
             # 이번 달 투자 (투자 기간 동안만)
@@ -1136,10 +1167,10 @@ class LumpSumVsDcaAnalyzer:
                     dca_return = 0.0
                     dca_cumulative_return = 0.0
             
-            # 적립식 MDD 계산
-            if dca_value > 0:
-                dca_peak = max(dca_peak, dca_value)
-                dca_mdd = min(0, (dca_value / dca_peak - 1) * 100)
+            # 적립식 MDD 계산 (수익률 기반)
+            if dca_total_invested > 0:
+                dca_peak_return = max(dca_peak_return, dca_cumulative_return)
+                dca_mdd = min(0, dca_cumulative_return - dca_peak_return)
             else:
                 dca_mdd = 0.0
             
@@ -1173,6 +1204,7 @@ class LumpSumVsDcaAnalyzer:
     
     def export_detailed_analysis_to_excel(self, records: List[MonthlyRecord], 
                                         start_date: str, 
+                                        price_data: pd.DataFrame,
                                         output_path: str = "results/lump_sum_vs_dca/") -> str:
         """
         월별 상세 분석 결과를 Excel로 출력
@@ -1311,9 +1343,21 @@ class LumpSumVsDcaAnalyzer:
         # 최종 결과 계산
         final_record = records[-1]
         
-        # 전체 기간 중 최악의 MDD 계산
-        worst_lump_sum_mdd = min(record.lump_sum_mdd for record in records)
-        worst_dca_mdd = min(record.dca_mdd for record in records)
+        # 전체 기간 중 최악의 MDD 계산 (일별 Low 가격 기반)
+        import pytz
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+        end_dt = start_dt + relativedelta(years=self.config.analysis_period_years)
+        
+        daily_dates, daily_lump_sum_mdds, daily_dca_mdds = self.calculate_daily_mdd(
+            price_data, start_dt, end_dt
+        )
+        if daily_lump_sum_mdds and daily_dca_mdds:
+            worst_lump_sum_mdd = min(daily_lump_sum_mdds)
+            worst_dca_mdd = min(daily_dca_mdds)
+        else:
+            # 일별 데이터를 사용할 수 없는 경우 월별 데이터 사용
+            worst_lump_sum_mdd = min(record.lump_sum_mdd for record in records)
+            worst_dca_mdd = min(record.dca_mdd for record in records)
         
         summary_data = [
             ["구분", "일시금투자", "적립식투자"],
