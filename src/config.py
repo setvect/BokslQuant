@@ -9,9 +9,11 @@ from typing import Dict, Any
 class Config:
     """퀀트 투자 분석 설정 클래스"""
     
-    def __init__(self):
+    def __init__(self, backtest_type: str = "lump_sum_vs_dca"):
         self.data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-        self.results_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'results')
+        self.base_results_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'results')
+        self.backtest_type = backtest_type
+        self.results_dir = os.path.join(self.base_results_dir, backtest_type)
         self.initial_capital = 10_000_000  # 고정 투자금 1천만원
         
         # 기본 설정값
@@ -21,7 +23,16 @@ class Config:
         self.investment_period_years = 10
         self.dca_months = 60
         
-        # 결과 디렉토리 생성
+        # 결과 디렉토리 생성 (백테스팅 타입별)
+        self._create_results_directories()
+    
+    def _create_results_directories(self):
+        """결과 디렉토리들 생성"""
+        # 기본 results 디렉토리
+        if not os.path.exists(self.base_results_dir):
+            os.makedirs(self.base_results_dir)
+        
+        # 백테스팅 타입별 디렉토리
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
     
@@ -59,11 +70,13 @@ class Config:
     def to_dict(self) -> Dict[str, Any]:
         """설정을 딕셔너리로 반환"""
         return {
+            'backtest_type': self.backtest_type,
             'symbol': self.symbol,
             'start_year': self.start_year,
             'start_month': self.start_month,
             'investment_period_years': self.investment_period_years,
             'dca_months': self.dca_months,
             'initial_capital': self.initial_capital,
-            'dca_monthly_amount': self.get_dca_monthly_amount()
+            'dca_monthly_amount': self.get_dca_monthly_amount(),
+            'results_dir': self.results_dir
         }

@@ -10,15 +10,21 @@
 # 의존성 설치
 pip install -r requirements.txt
 
-# 실행 (현재 미완성)
+# 일시투자 vs 적립투자 백테스팅 실행
+cd backtests/lump_sum_vs_dca
+python run_backtest.py
+
+# 또는 직접 실행
+cd backtests/lump_sum_vs_dca/src
 python main.py
 ```
 
 
 ## 개발 노트
-- 프로젝트는 초기 단계로 main.py에서 참조하는 대부분의 모듈이 아직 구현되지 않음
-- 설정 시스템만 완성되어 있음
-- 향후 모듈별 순차적 개발 필요
+- **일시투자 vs 적립투자 백테스팅**: `backtests/lump_sum_vs_dca/` - ✅ 완성
+- **새로운 백테스팅 구조**: 각 백테스팅별 독립 모듈로 구성
+- **공통 모듈**: `src/` - 베이스 클래스 및 공통 유틸리티
+- **향후 백테스팅**: 모멘텀 전략, 변동성 돌파, 섹터 로테이션 등 계획됨
 
 ## 개발 표준 및 가이드라인
 
@@ -95,9 +101,17 @@ plt.savefig(chart_path, dpi=300, bbox_inches='tight')
 ```
 
 ### 📁 파일 구조 표준
-- Excel 파일: `results/{분석종류}/` 디렉토리에 저장
-- 차트 파일: `results/{분석종류}/charts/` 디렉토리에 저장
-- 파일명: `{분석종류}_{시작일}_{타임스탬프}` 형식 사용
+
+#### 새로운 독립 모듈 구조 (권장)
+- 백테스팅별 독립 디렉토리: `backtests/{백테스팅타입}/`
+- Excel 파일: `backtests/{백테스팅타입}/results/excel/`
+- 차트 파일: `backtests/{백테스팅타입}/results/charts/`
+- 보고서: `backtests/{백테스팅타입}/results/reports/`
+- 설정 파일: `backtests/{백테스팅타입}/configs/`
+
+#### 기존 중앙 집중식 구조 (레거시)
+- Excel 파일: `results/{백테스팅타입}/` 디렉토리에 저장
+- 파일명: `{분석종류}_{지수}_{시작일}_{타임스탬프}` 형식 사용
 
 ### 🔧 코드 품질 표준
 - 중복 코드 방지: 동일한 알고리즘은 하나의 모듈에서 관리

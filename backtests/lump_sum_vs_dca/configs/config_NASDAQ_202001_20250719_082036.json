@@ -1,0 +1,11 @@
+{
+  "symbol": "NASDAQ",
+  "start_year": 2020,
+  "start_month": 1,
+  "investment_period_years": 3,
+  "dca_months": 24,
+  "initial_capital": 10000000,
+  "dca_monthly_amount": 416666.6666666667,
+  "backtest_type": "lump_sum_vs_dca",
+  "created_at": "2025-07-19T08:20:36.999776"
+}

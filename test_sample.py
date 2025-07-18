@@ -15,8 +15,8 @@ from src.analysis_types.lump_sum_vs_dca.excel_exporter import ExcelExporter
 
 def test_sample():
     """샘플 테스트"""
-    # 설정 생성
-    config = Config()
+    # 설정 생성 (백테스팅 타입 지정)
+    config = Config(backtest_type="lump_sum_vs_dca")
     config.set_analysis_params(
         symbol="NASDAQ",
         start_year=2000,
@@ -26,12 +26,14 @@ def test_sample():
     )
     
     print("=== 설정 정보 ===")
+    print(f"백테스팅 타입: {config.backtest_type}")
     print(f"지수: {config.symbol}")
     print(f"투자 시작: {config.start_year}년 {config.start_month}월")
     print(f"투자 기간: {config.investment_period_years}년")
     print(f"적립 분할 월수: {config.dca_months}개월")
     print(f"총 투자금: {config.initial_capital:,}원")
     print(f"월 적립금: {config.get_dca_monthly_amount():,.0f}원")
+    print(f"결과 저장 경로: {config.results_dir}")
     
     # 백테스팅 실행
     print("\n[1] 백테스팅 실행 중...")
