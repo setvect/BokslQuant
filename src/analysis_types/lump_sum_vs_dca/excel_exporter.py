@@ -294,6 +294,12 @@ class ExcelExporter:
                         cell.number_format = FORMAT_PERCENTAGE_00
                         cell.alignment = Alignment(horizontal="right")
                 
+                # 샤프 지수 형식 (소수점 2자리)
+                elif '샤프 지수' in str(ws.cell(cell.row, 1).value):
+                    if is_numeric(cell.value) and cell.column > 1:
+                        cell.number_format = "0.00"
+                        cell.alignment = Alignment(horizontal="right")
+                
                 # 퍼센트 지표 형식 (CAGR, MDD, 변동성, 최종 수익률)
                 elif any(keyword in str(ws.cell(cell.row, 1).value) for keyword in ['CAGR', 'MDD', '변동성', '최종 수익률']):
                     if is_numeric(cell.value) and cell.column > 1:
