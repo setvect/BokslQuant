@@ -3,7 +3,7 @@ Excel 출력 모듈
 """
 import pandas as pd
 import openpyxl
-from openpyxl.styles import PatternFill, Font, Alignment
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles.numbers import FORMAT_NUMBER_COMMA_SEPARATED1, FORMAT_PERCENTAGE_00
 import os
@@ -48,7 +48,7 @@ class ExcelExporter:
         ws = self.workbook.create_sheet("매수 내역")
         
         # 헤더 설정
-        headers = ['구분', '매수일', '매수가격', '매수금액', '매수수량']
+        headers = ['구분', '매수일', '매수가격', '매수금액', '매수수량', '누적수량', '평단가']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -60,22 +60,40 @@ class ExcelExporter:
         
         # 일시투자 데이터
         lump_sum_trades = comparison_result['lump_sum']['trades']
+        cumulative_shares = 0
+        cumulative_invested = 0
+        
         for trade in lump_sum_trades:
+            cumulative_shares += trade['shares']
+            cumulative_invested += trade['amount']
+            avg_price = cumulative_invested / cumulative_shares
+            
             ws.cell(row=row, column=1, value="일시투자")
             ws.cell(row=row, column=2, value=trade['date'])
             ws.cell(row=row, column=3, value=trade['price'])
             ws.cell(row=row, column=4, value=trade['amount'])
             ws.cell(row=row, column=5, value=trade['shares'])
+            ws.cell(row=row, column=6, value=cumulative_shares)
+            ws.cell(row=row, column=7, value=avg_price)
             row += 1
         
         # 적립투자 데이터
         dca_trades = comparison_result['dca']['trades']
+        cumulative_shares = 0
+        cumulative_invested = 0
+        
         for trade in dca_trades:
+            cumulative_shares += trade['shares']
+            cumulative_invested += trade['amount']
+            avg_price = cumulative_invested / cumulative_shares
+            
             ws.cell(row=row, column=1, value="적립투자")
             ws.cell(row=row, column=2, value=trade['date'])
             ws.cell(row=row, column=3, value=trade['price'])
             ws.cell(row=row, column=4, value=trade['amount'])
             ws.cell(row=row, column=5, value=trade['shares'])
+            ws.cell(row=row, column=6, value=cumulative_shares)
+            ws.cell(row=row, column=7, value=avg_price)
             row += 1
         
         # 셀 서식 적용
@@ -101,8 +119,10 @@ class ExcelExporter:
             'date', 
             '일시투자_price', '일시투자_invested_amount', '일시투자_shares', 
             '일시투자_average_price', '일시투자_current_value', '일시투자_total_return',
-            '적립투자_price', '적립투자_invested_amount', '적립투자_shares',
-            '적립투자_average_price', '적립투자_current_value', '적립투자_total_return'
+            '일시투자_peak_return', '일시투자_drawdown',
+            '적립투자_invested_amount', '적립투자_shares',
+            '적립투자_average_price', '적립투자_current_value', '적립투자_total_return',
+            '적립투자_peak_return', '적립투자_drawdown'
         ]
         
         # 존재하는 컬럼만 선택
@@ -112,18 +132,21 @@ class ExcelExporter:
         # 컬럼명 한글화
         column_mapping = {
             'date': '날짜',
-            '일시투자_price': '일시투자_현재가',
+            '일시투자_price': '종가',
             '일시투자_invested_amount': '일시투자_투자금액',
             '일시투자_shares': '일시투자_보유수량',
             '일시투자_average_price': '일시투자_평균단가',
             '일시투자_current_value': '일시투자_현재가치',
             '일시투자_total_return': '일시투자_수익률',
-            '적립투자_price': '적립투자_현재가',
+            '일시투자_peak_return': '일시투자_전고점수익률',
+            '일시투자_drawdown': '일시투자_고점대비손실폭',
             '적립투자_invested_amount': '적립투자_투자금액',
             '적립투자_shares': '적립투자_보유수량',
             '적립투자_average_price': '적립투자_평균단가',
             '적립투자_current_value': '적립투자_현재가치',
-            '적립투자_total_return': '적립투자_수익률'
+            '적립투자_total_return': '적립투자_수익률',
+            '적립투자_peak_return': '적립투자_전고점수익률',
+            '적립투자_drawdown': '적립투자_고점대비손실폭'
         }
         
         merged_df.rename(columns=column_mapping, inplace=True)
@@ -143,30 +166,27 @@ class ExcelExporter:
         lump_sum_metrics = analyzer.calculate_metrics(comparison_result['lump_sum'])
         dca_metrics = analyzer.calculate_metrics(comparison_result['dca'])
         
-        # 요약 테이블 생성
+        # 요약 테이블 생성 (순수 숫자 값으로 저장)
         summary_data = [
             ['구분', '일시투자', '적립투자', '차이'],
-            ['최종 수익률', f"{lump_sum_metrics['final_return']*100:.2f}%", 
-             f"{dca_metrics['final_return']*100:.2f}%", 
-             f"{(lump_sum_metrics['final_return'] - dca_metrics['final_return'])*100:.2f}%"],
-            ['CAGR', f"{lump_sum_metrics['cagr']*100:.2f}%", 
-             f"{dca_metrics['cagr']*100:.2f}%", 
-             f"{(lump_sum_metrics['cagr'] - dca_metrics['cagr'])*100:.2f}%"],
-            ['MDD', f"{lump_sum_metrics['mdd']*100:.2f}%", 
-             f"{dca_metrics['mdd']*100:.2f}%", 
-             f"{(lump_sum_metrics['mdd'] - dca_metrics['mdd'])*100:.2f}%"],
-            ['샤프 지수', f"{lump_sum_metrics['sharpe_ratio']:.3f}", 
-             f"{dca_metrics['sharpe_ratio']:.3f}", 
-             f"{lump_sum_metrics['sharpe_ratio'] - dca_metrics['sharpe_ratio']:.3f}"],
-            ['변동성', f"{lump_sum_metrics['volatility']*100:.2f}%", 
-             f"{dca_metrics['volatility']*100:.2f}%", 
-             f"{(lump_sum_metrics['volatility'] - dca_metrics['volatility'])*100:.2f}%"],
-            ['승률', f"{lump_sum_metrics['win_rate']*100:.2f}%", 
-             f"{dca_metrics['win_rate']*100:.2f}%", 
-             f"{(lump_sum_metrics['win_rate'] - dca_metrics['win_rate'])*100:.2f}%"],
-            ['최종 가치', f"{lump_sum_metrics['final_value']:,.0f}원", 
-             f"{dca_metrics['final_value']:,.0f}원", 
-             f"{lump_sum_metrics['final_value'] - dca_metrics['final_value']:,.0f}원"]
+            ['최종 수익률', lump_sum_metrics['final_return'], 
+             dca_metrics['final_return'], 
+             lump_sum_metrics['final_return'] - dca_metrics['final_return']],
+            ['CAGR', lump_sum_metrics['cagr'], 
+             dca_metrics['cagr'], 
+             lump_sum_metrics['cagr'] - dca_metrics['cagr']],
+            ['MDD', lump_sum_metrics['mdd'], 
+             dca_metrics['mdd'], 
+             lump_sum_metrics['mdd'] - dca_metrics['mdd']],
+            ['샤프 지수', lump_sum_metrics['sharpe_ratio'], 
+             dca_metrics['sharpe_ratio'], 
+             lump_sum_metrics['sharpe_ratio'] - dca_metrics['sharpe_ratio']],
+            ['변동성', lump_sum_metrics['volatility'], 
+             dca_metrics['volatility'], 
+             lump_sum_metrics['volatility'] - dca_metrics['volatility']],
+            ['최종 가치', lump_sum_metrics['final_value'], 
+             dca_metrics['final_value'], 
+             lump_sum_metrics['final_value'] - dca_metrics['final_value']]
         ]
         
         # 데이터 입력
@@ -180,8 +200,8 @@ class ExcelExporter:
         ws.append(['투자 시작', f"{self.config.start_year}년 {self.config.start_month}월"])
         ws.append(['투자 기간', f"{self.config.investment_period_years}년"])
         ws.append(['적립 분할 월수', f"{self.config.dca_months}개월"])
-        ws.append(['총 투자금', f"{self.config.initial_capital:,}원"])
-        ws.append(['월 적립금', f"{self.config.get_dca_monthly_amount():,.0f}원"])
+        ws.append(['총 투자금', f"{self.config.initial_capital:,}"])
+        ws.append(['월 적립금', f"{self.config.get_dca_monthly_amount():,.0f}"])
         
         # 셀 서식 적용
         self._apply_cell_formatting(ws)
@@ -191,20 +211,57 @@ class ExcelExporter:
         # 머리행 고정
         ws.freeze_panes = 'A2'
         
-        # 열 너비 조정
+        # 색상 정의
+        common_color = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")  # 연한 회색
+        lump_sum_color = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")  # 연한 파란색
+        dca_color = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")  # 연한 초록색
+        
+        # 테두리 정의
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # 열 너비 조정 및 컬럼별 색상 적용
         for column in ws.columns:
             max_length = 0
             column_letter = column[0].column_letter
+            header_value = str(column[0].value) if column[0].value else ""
             
+            # 컬럼 유형별 색상 결정
+            if any(keyword in header_value for keyword in ['날짜', '종가', '구분', '매수일', '매수가격']):
+                column_color = common_color
+            elif '일시투자' in header_value:
+                column_color = lump_sum_color
+            elif '적립투자' in header_value:
+                column_color = dca_color
+            else:
+                column_color = common_color
+            
+            # 해당 컬럼의 모든 셀에 색상 및 테두리 적용
             for cell in column:
+                cell.fill = column_color
+                cell.border = thin_border
+                
+                # 첫 번째 행(헤더)은 볼드체 적용
+                if cell.row == 1:
+                    cell.font = Font(bold=True)
+                
+                # 길이 계산 (실제 표시될 텍스트 길이 고려)
                 try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
+                    cell_text = str(cell.value) if cell.value is not None else ""
+                    # 한글은 2배 가중치 적용
+                    text_length = sum(2 if ord(c) > 127 else 1 for c in cell_text)
+                    if text_length > max_length:
+                        max_length = text_length
                 except:
                     pass
             
-            adjusted_width = min(max_length + 2, 18)
-            ws.column_dimensions[column_letter].width = adjusted_width
+            # 데이터에 맞는 최적 너비 설정 (최소 8, 최대 25)
+            optimal_width = max(8, min(max_length + 2, 25))
+            ws.column_dimensions[column_letter].width = optimal_width
         
         # 데이터 타입별 서식 적용
         for row in ws.iter_rows():
@@ -212,28 +269,59 @@ class ExcelExporter:
                 if cell.value is None:
                     continue
                 
+                # 숫자 타입 확인 함수 (numpy 타입 포함)
+                def is_numeric(value):
+                    try:
+                        float(value)
+                        return True
+                    except (ValueError, TypeError):
+                        return False
+                
+                # 최종 가치 행 우선 처리 (금액 형식)  
+                if cell.row > 1 and ws.cell(cell.row, 1).value == '최종 가치':
+                    if is_numeric(cell.value) and cell.column > 1:
+                        cell.number_format = "#,##0"
+                        cell.alignment = Alignment(horizontal="right")
+                        continue  # 다른 조건들 건너뛰기
+                
                 # 날짜 형식
-                if '날짜' in str(ws.cell(1, cell.column).value) or 'date' in str(ws.cell(1, cell.column).value):
+                elif '날짜' in str(ws.cell(1, cell.column).value) or 'date' in str(ws.cell(1, cell.column).value):
                     cell.alignment = Alignment(horizontal="center")
                 
                 # 수익률 형식
                 elif '수익률' in str(ws.cell(1, cell.column).value) or 'return' in str(ws.cell(1, cell.column).value):
-                    if isinstance(cell.value, (int, float)) and cell.row > 1:
+                    if is_numeric(cell.value) and cell.row > 1:
                         cell.number_format = FORMAT_PERCENTAGE_00
                         cell.alignment = Alignment(horizontal="right")
                 
-                # 금액 형식
-                elif any(keyword in str(ws.cell(1, cell.column).value) for keyword in ['금액', '가치', '가격', 'amount', 'value', 'price']):
-                    if isinstance(cell.value, (int, float)) and cell.row > 1:
-                        cell.number_format = FORMAT_NUMBER_COMMA_SEPARATED1
+                # 퍼센트 지표 형식 (CAGR, MDD, 변동성, 최종 수익률)
+                elif any(keyword in str(ws.cell(cell.row, 1).value) for keyword in ['CAGR', 'MDD', '변동성', '최종 수익률']):
+                    if is_numeric(cell.value) and cell.column > 1:
+                        cell.number_format = FORMAT_PERCENTAGE_00
                         cell.alignment = Alignment(horizontal="right")
                 
-                # 수량 형식
+                # 금액 형식 (소수점 없음)
+                elif any(keyword in str(ws.cell(1, cell.column).value) for keyword in ['금액', '가치', '가격', 'amount', 'value', 'price']):
+                    if is_numeric(cell.value) and cell.row > 1:
+                        cell.number_format = "#,##0"
+                        cell.alignment = Alignment(horizontal="right")
+                
+                # 수량 및 평단가 형식 (소수점 2자리)
                 elif any(keyword in str(ws.cell(1, cell.column).value) for keyword in ['수량', '평균단가', 'shares', 'average_price']):
-                    if isinstance(cell.value, (int, float)) and cell.row > 1:
-                        cell.number_format = "#,##0.0000"
+                    if is_numeric(cell.value) and cell.row > 1:
+                        cell.number_format = "#,##0.00"
+                        cell.alignment = Alignment(horizontal="right")
+                
+                # 손실폭 형식 (소수점 2자리 퍼센트)
+                elif '고점대비손실폭' in str(ws.cell(1, cell.column).value):
+                    if is_numeric(cell.value) and cell.row > 1:
+                        cell.number_format = "0.00%"
                         cell.alignment = Alignment(horizontal="right")
                 
                 # 일반 숫자 형식
-                elif isinstance(cell.value, (int, float)) and cell.row > 1:
+                elif is_numeric(cell.value) and cell.row > 1:
+                    cell.alignment = Alignment(horizontal="right")
+                
+                # 모든 숫자 데이터 오른쪽 정렬 (헤더 제외) - 이미 위에서 처리되지 않은 경우
+                elif cell.row > 1 and is_numeric(cell.value):
                     cell.alignment = Alignment(horizontal="right")

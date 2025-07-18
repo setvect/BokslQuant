@@ -63,7 +63,12 @@ class PerformanceAnalyzer:
         if daily_returns.empty:
             return 0
         
-        # 누적 수익률 계산
+        # 백테스터에서 계산된 drawdown 컬럼 사용
+        if 'drawdown' in daily_returns.columns:
+            # drawdown 컬럼의 최솟값이 MDD (가장 큰 손실)
+            return abs(daily_returns['drawdown'].min())
+        
+        # 백업: drawdown 컬럼이 없는 경우 기존 방식 사용
         values = daily_returns['current_value'].values
         invested = daily_returns['invested_amount'].values
         
@@ -81,8 +86,11 @@ class PerformanceAnalyzer:
         if len(daily_returns) < 2:
             return 0
         
-        # 일별 수익률 계산
-        daily_returns_pct = daily_returns['total_return'].pct_change().dropna()
+        # 포트폴리오 수익률 기준으로 일별 수익률 계산
+        # total_return 컬럼의 일별 변화를 사용
+        daily_returns_df = daily_returns.copy()
+        daily_returns_df['portfolio_daily_return'] = daily_returns_df['total_return'].diff()
+        daily_returns_pct = daily_returns_df['portfolio_daily_return'].dropna()
         
         if daily_returns_pct.empty or daily_returns_pct.std() == 0:
             return 0
@@ -98,8 +106,11 @@ class PerformanceAnalyzer:
         if len(daily_returns) < 2:
             return 0
         
-        # 일별 수익률 계산
-        daily_returns_pct = daily_returns['total_return'].pct_change().dropna()
+        # 포트폴리오 수익률 기준으로 일별 수익률 계산
+        # total_return 컬럼의 일별 변화를 사용
+        daily_returns_df = daily_returns.copy()
+        daily_returns_df['portfolio_daily_return'] = daily_returns_df['total_return'].diff()
+        daily_returns_pct = daily_returns_df['portfolio_daily_return'].dropna()
         
         if daily_returns_pct.empty:
             return 0

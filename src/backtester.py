@@ -83,7 +83,20 @@ class Backtester:
                 'daily_return': daily_return
             })
         
-        return pd.DataFrame(results)
+        # 전고점 수익률과 손실폭 계산
+        df = pd.DataFrame(results)
+        if not df.empty:
+            # 최고점 수익률 (누적 최대값)
+            df['peak_return'] = df['total_return'].cummax()
+            
+            # 올바른 Drawdown 계산: (현재 수익률 - 최고점 수익률) / (1 + 최고점 수익률)
+            # 단, 최고점 수익률이 0보다 클 때만 적용
+            df['drawdown'] = df.apply(lambda row: 
+                (row['total_return'] - row['peak_return']) / (1 + row['peak_return']) 
+                if row['peak_return'] > 0 
+                else row['total_return'] - row['peak_return'], axis=1)
+        
+        return df
     
     def run_backtest(self, symbol: str, strategy_type: str) -> Dict[str, Any]:
         """백테스팅 실행 - 하위 클래스에서 구현"""
