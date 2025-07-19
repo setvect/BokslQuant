@@ -18,11 +18,6 @@ class BaseStrategy(ABC):
             'average_price': 0
         }
     
-    @abstractmethod
-    def execute(self, data: pd.DataFrame) -> Dict[str, Any]:
-        """전략 실행 메서드"""
-        pass
-    
     def add_trade(self, date: str, price: float, amount: float, shares: float):
         """거래 기록 추가"""
         self.trades.append({
@@ -37,3 +32,17 @@ class BaseStrategy(ABC):
         self.portfolio['total_shares'] += shares
         if self.portfolio['total_shares'] > 0:
             self.portfolio['average_price'] = self.portfolio['total_invested'] / self.portfolio['total_shares']
+    
+    @abstractmethod
+    def execute(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """전략 실행 - 하위 클래스에서 구현"""
+        pass
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """전략 실행 결과 요약"""
+        return {
+            'trades_count': len(self.trades),
+            'total_invested': self.portfolio['total_invested'],
+            'total_shares': self.portfolio['total_shares'],
+            'average_price': self.portfolio['average_price']
+        }

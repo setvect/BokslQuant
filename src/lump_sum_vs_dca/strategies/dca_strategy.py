@@ -4,13 +4,11 @@
 import pandas as pd
 from typing import Dict, Any
 # 모듈 경로 설정
-import sys
 import os
 import importlib.util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.dirname(os.path.dirname(current_dir))  # /src 디렉토리
-base_strategy_path = os.path.join(src_dir, 'strategies', 'base_strategy.py')
+base_strategy_path = os.path.join(current_dir, 'base_strategy.py')
 
 # BaseStrategy 직접 import
 spec = importlib.util.spec_from_file_location("base_strategy", base_strategy_path)
@@ -35,7 +33,7 @@ class DollarCostAverageStrategy(BaseStrategy):
         current_year = self.config.start_year
         current_month = self.config.start_month
         
-        for i in range(self.config.dca_months):
+        for _ in range(self.config.dca_months):
             # 해당 년월의 첫 거래일 찾기
             month_data = data[
                 (data['year'] == current_year) & 
