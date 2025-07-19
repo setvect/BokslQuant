@@ -18,7 +18,7 @@ class LumpSumVsDcaConfig:
         self.backtest_root = os.path.dirname(os.path.dirname(__file__))
         
         # 프로젝트 루트 디렉토리  
-        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(self.backtest_root)))
+        self.project_root = os.path.dirname(os.path.dirname(self.backtest_root))
         
         # 디렉토리 경로 설정
         self.data_dir = os.path.join(self.project_root, 'data')
@@ -26,7 +26,6 @@ class LumpSumVsDcaConfig:
         self.excel_dir = os.path.join(self.results_dir, 'excel')
         self.charts_dir = os.path.join(self.results_dir, 'charts')
         self.reports_dir = os.path.join(self.results_dir, 'reports')
-        self.configs_dir = os.path.join(self.backtest_root, 'configs')
         self.docs_dir = os.path.join(self.backtest_root, 'docs')
         
         # 고정 투자금 설정
@@ -49,7 +48,6 @@ class LumpSumVsDcaConfig:
             self.excel_dir,
             self.charts_dir,
             self.reports_dir,
-            self.configs_dir,
             self.docs_dir
         ]
         
@@ -93,49 +91,6 @@ class LumpSumVsDcaConfig:
         """Excel 결과 파일 전체 경로 반환"""
         return os.path.join(self.excel_dir, self.get_excel_filename())
     
-    def save_config(self, filename: str = None) -> str:
-        """현재 설정을 파일로 저장"""
-        if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"config_{self.symbol}_{self.start_year}{self.start_month:02d}_{timestamp}.json"
-        
-        config_path = os.path.join(self.configs_dir, filename)
-        
-        import json
-        config_data = self.to_dict()
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(config_data, f, indent=2, ensure_ascii=False)
-        
-        return config_path
-    
-    def load_config(self, filename: str):
-        """설정 파일에서 불러오기"""
-        config_path = os.path.join(self.configs_dir, filename)
-        
-        import json
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config_data = json.load(f)
-        
-        self.symbol = config_data['symbol']
-        self.start_year = config_data['start_year']
-        self.start_month = config_data['start_month']
-        self.investment_period_years = config_data['investment_period_years']
-        self.dca_months = config_data['dca_months']
-        self.initial_capital = config_data['initial_capital']
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """설정을 딕셔너리로 반환"""
-        return {
-            'symbol': self.symbol,
-            'start_year': self.start_year,
-            'start_month': self.start_month,
-            'investment_period_years': self.investment_period_years,
-            'dca_months': self.dca_months,
-            'initial_capital': self.initial_capital,
-            'dca_monthly_amount': self.get_dca_monthly_amount(),
-            'backtest_type': 'lump_sum_vs_dca',
-            'created_at': datetime.now().isoformat()
-        }
     
     def __str__(self):
         """설정 정보를 문자열로 반환"""

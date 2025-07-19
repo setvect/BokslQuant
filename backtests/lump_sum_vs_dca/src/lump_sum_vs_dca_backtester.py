@@ -14,7 +14,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 sys.path.append(os.path.join(project_root, 'src'))
 
 from backtester import Backtester as BaseBacktester
-from strategy_factory import LumpSumVsDcaStrategyFactory
+from .strategy_factory import LumpSumVsDcaStrategyFactory
 
 
 class LumpSumVsDcaBacktester(BaseBacktester):
@@ -36,7 +36,14 @@ class LumpSumVsDcaBacktester(BaseBacktester):
         result = {
             'strategy_type': strategy_type,
             'symbol': symbol,
-            'config': self.config.to_dict(),
+            'config': {
+                'symbol': self.config.symbol,
+                'start_year': self.config.start_year,
+                'start_month': self.config.start_month,
+                'investment_period_years': self.config.investment_period_years,
+                'dca_months': self.config.dca_months,
+                'initial_capital': self.config.initial_capital
+            },
             'trades': strategy_result['trades'],
             'portfolio': strategy_result['portfolio'],
             'daily_returns': daily_returns,

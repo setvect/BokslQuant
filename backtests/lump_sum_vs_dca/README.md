@@ -11,7 +11,7 @@ lump_sum_vs_dca/
 │   ├── lump_sum_vs_dca_backtester.py  # 백테스터
 │   ├── excel_exporter.py          # Excel 내보내기
 │   ├── strategy_factory.py        # 전략 팩토리
-│   ├── main.py                    # 메인 실행 스크립트
+│   ├── main_interactive.py        # 대화형 실행 스크립트 (레거시)
 │   └── strategies/                # 투자 전략들
 │       ├── lump_sum_strategy.py   # 일시투자 전략
 │       └── dca_strategy.py        # 적립투자 전략
@@ -19,7 +19,6 @@ lump_sum_vs_dca/
 │   ├── excel/                     # Excel 파일들
 │   ├── charts/                    # 차트 파일들
 │   └── reports/                   # 보고서들
-├── configs/                       # 설정 파일들
 ├── docs/                          # 백테스팅별 문서
 ├── run_backtest.py               # 실행 스크립트
 └── README.md                     # 이 파일
@@ -27,15 +26,34 @@ lump_sum_vs_dca/
 
 ## 실행 방법
 
-### 1. 대화형 실행
+### 테스트 코드 방식 (권장)
 ```bash
+# 1. run_backtest.py에서 BACKTEST_CONFIG 변수 수정
+# 2. 실행
 python run_backtest.py
 ```
 
-### 2. 직접 실행
+#### 설정 변수 예시
+```python
+BACKTEST_CONFIG = {
+    'symbol': 'NASDAQ',                    # 투자 지수
+    'start_year': 2020,                    # 투자 시작 연도
+    'start_month': 1,                      # 투자 시작 월 (1-12)
+    'investment_period_years': 3,          # 투자 기간 (년)
+    'dca_months': 24,                      # 적립 분할 월수
+}
+```
+
+#### 장점
+- 반복 실행 용이
+- 설정 관리 간편
+- 자동화 가능
+- 버전 관리 추적 가능
+
+### 대화형 실행 (레거시)
 ```bash
 cd src
-python main.py
+python main_interactive.py
 ```
 
 ## 설정
@@ -46,24 +64,23 @@ python main.py
 - **기본 투자 기간**: 10년
 - **기본 적립 분할**: 60개월
 
-### 설정 파일 관리
-```python
-from config import LumpSumVsDcaConfig
+### 설정 관리
+백테스트 설정은 Excel 파일의 "백테스트 설정" 시트에 자동으로 저장됩니다.
 
-# 설정 생성
+```python
+from src.config import LumpSumVsDcaConfig
+
+# 설정 생성 및 파라미터 설정
 config = LumpSumVsDcaConfig()
 config.set_analysis_params('NASDAQ', 2020, 1, 3, 24)
 
-# 설정 저장
-config_path = config.save_config()
-
-# 설정 불러오기
-config.load_config('config_filename.json')
+# 백테스트 실행 시 Excel 파일에 설정 정보가 자동 저장됨
 ```
 
 ## 분석 결과물
 
 ### 1. Excel 파일
+- **백테스트 설정**: 실행 설정 정보 (투자 설정, 파일 정보 등)
 - **매수 내역**: 거래별 세부 정보
 - **일 수익률 변화**: 일별 포트폴리오 변화
 - **분석 요약**: 성과 지표 비교
@@ -97,3 +114,4 @@ config.load_config('config_filename.json')
 - 이 모듈은 독립적으로 실행되도록 설계됨
 - 공통 모듈(`src/`)에 대한 의존성 최소화
 - 결과물은 `results/` 하위 디렉토리에 자동 저장
+- 백테스트 설정은 Excel 파일에 통합 저장되어 별도 설정 파일 불필요

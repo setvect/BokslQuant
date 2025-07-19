@@ -33,6 +33,7 @@ class ExcelExporter:
         self.workbook.remove(self.workbook.active)
         
         # 각 시트 생성
+        self._create_backtest_settings_sheet()
         self._create_purchase_history_sheet(comparison_result)
         self._create_daily_returns_sheet(comparison_result)
         self._create_analysis_summary_sheet(comparison_result, analyzer)
@@ -330,3 +331,54 @@ class ExcelExporter:
                 # 모든 숫자 데이터 오른쪽 정렬 (헤더 제외) - 이미 위에서 처리되지 않은 경우
                 elif cell.row > 1 and is_numeric(cell.value):
                     cell.alignment = Alignment(horizontal="right")
+    
+    def _create_backtest_settings_sheet(self):
+        """백테스트 설정 시트 생성"""
+        ws = self.workbook.create_sheet("백테스트 설정")
+        
+        # 제목 설정
+        ws.cell(row=1, column=1, value="백테스트 설정 정보")
+        ws.cell(row=1, column=1).font = Font(bold=True, size=14)
+        ws.cell(row=1, column=1).alignment = Alignment(horizontal="left")
+        
+        # 설정 정보 추가
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        settings_data = [
+            ["실행 시간", current_time],
+            ["", ""],  # 빈 행
+            ["투자 설정", ""],
+            ["지수", self.config.symbol],
+            ["투자 시작일", f"{self.config.start_year}년 {self.config.start_month}월"],
+            ["투자 기간", f"{self.config.investment_period_years}년"],
+            ["적립 분할 월수", f"{self.config.dca_months}개월"],
+            ["총 투자금", f"{self.config.initial_capital:,}원"],
+            ["월 적립금", f"{self.config.get_dca_monthly_amount():,.0f}원"],
+            ["", ""],  # 빈 행
+            ["파일 정보", ""],
+            ["데이터 파일", f"{self.config.symbol}_data.csv"],
+            ["결과 파일", self.config.get_excel_filename()],
+            ["생성 디렉토리", self.config.excel_dir],
+        ]
+        
+        # 데이터 입력
+        for row_idx, (key, value) in enumerate(settings_data, start=3):
+            if key:  # 키가 있는 경우
+                ws.cell(row=row_idx, column=1, value=key)
+                ws.cell(row=row_idx, column=1).font = Font(bold=True)
+                ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal="left")
+                
+                if value:  # 값이 있는 경우
+                    ws.cell(row=row_idx, column=2, value=value)
+                    ws.cell(row=row_idx, column=2).alignment = Alignment(horizontal="left")
+                    
+                    # 섹션 제목 스타일링
+                    if not value and key in ["투자 설정", "파일 정보"]:
+                        ws.cell(row=row_idx, column=1).fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+        
+        # 열 너비 조정
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 30
+        
+        # 머리행 고정
+        ws.freeze_panes = 'A2'

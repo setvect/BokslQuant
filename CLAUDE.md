@@ -10,13 +10,14 @@
 # 의존성 설치
 pip install -r requirements.txt
 
-# 일시투자 vs 적립투자 백테스팅 실행
+# 일시투자 vs 적립투자 백테스팅 실행 (테스트 코드 방식)
 cd backtests/lump_sum_vs_dca
+# 1. run_backtest.py에서 BACKTEST_CONFIG 변수 수정
+# 2. 실행
 python run_backtest.py
 
-# 또는 직접 실행
-cd backtests/lump_sum_vs_dca/src
-python main.py
+# 기존 방식 (중앙 집중식)
+python test_sample.py
 ```
 
 
@@ -118,6 +119,34 @@ plt.savefig(chart_path, dpi=300, bbox_inches='tight')
 - 메서드 네이밍: 기능을 명확히 표현하는 이름 사용
 - 에러 처리: try-except 블록으로 안전한 처리
 - 타입 힌트: 함수 시그니처에 타입 명시
+
+### 🚀 백테스팅 실행 표준
+백테스팅 실행 시에는 **대화형 입력 방식보다 테스트 코드 방식**을 사용합니다.
+
+#### 테스트 코드 방식 (권장)
+```python
+# run_backtest.py 파일의 설정 변수 수정
+BACKTEST_CONFIG = {
+    'symbol': 'NASDAQ',                    # 투자 지수
+    'start_year': 2020,                    # 투자 시작 연도
+    'start_month': 1,                      # 투자 시작 월
+    'investment_period_years': 3,          # 투자 기간 (년)
+    'dca_months': 24,                      # 적립 분할 월수
+}
+```
+
+#### 장점
+- **반복 실행 용이**: 동일한 설정으로 여러 번 실행 가능
+- **설정 관리**: 변수 값만 수정하면 되므로 간편
+- **자동화 가능**: 스크립트나 배치 실행에 적합
+- **버전 관리**: 설정 변경 내역을 Git으로 추적 가능
+
+#### 사용법
+```bash
+# 1. 설정 변수 수정
+# 2. 실행
+python run_backtest.py
+```
 
 ## 상세 문서 참조
 개발 시 아래 문서들을 반드시 참조하세요:
