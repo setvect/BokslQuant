@@ -167,20 +167,20 @@ class ChartGenerator:
         ax.set_title(f'{self.config.symbol} 포트폴리오 가치 변화\n({self.config.start_year}년 {self.config.start_month}월 ~ {self.config.investment_period_years}년간)', 
                     fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('날짜', fontsize=12)
-        ax.set_ylabel('포트폴리오 가치 (원)', fontsize=12)
+        ax.set_ylabel('포트폴리오 가치', fontsize=12)
         ax.legend(fontsize=10, loc='upper left', frameon=True, fancybox=True, shadow=True, 
                  bbox_to_anchor=(0.02, 0.98))
         ax.grid(True, alpha=0.3)
         
-        # Y축 포맷 (천만원 단위)
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e7:.1f}천만원'))
+        # Y축 포맷 (천만 단위)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e7:.1f}천만'))
         
         # 최종 가치 표시
         final_lump_sum_value = lump_sum_data['current_value'].iloc[-1]
         final_dca_value = dca_data['current_value'].iloc[-1]
         
         # 텍스트 박스 (왼쪽 하단에 배치)
-        textstr = f'최종 포트폴리오 가치\n일시투자: {final_lump_sum_value:,.0f}원\n적립투자: {final_dca_value:,.0f}원\n차이: {final_lump_sum_value - final_dca_value:,.0f}원'
+        textstr = f'최종 포트폴리오 가치\n일시투자: {final_lump_sum_value:,.0f}\n적립투자: {final_dca_value:,.0f}\n차이: {final_lump_sum_value - final_dca_value:,.0f}'
         props = dict(boxstyle='round', facecolor='lightgray', alpha=0.8)
         ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
@@ -304,11 +304,21 @@ class ChartGenerator:
         ax.set_title(f'{self.config.symbol} 적립투자 타이밍 효과 분석\n(각 월별 투자의 최종 기여도)', 
                     fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('투자 시기', fontsize=12)
-        ax.set_ylabel('투자 기여도 (원)', fontsize=12)
-        ax2.set_ylabel('매수 가격 (포인트)', fontsize=12)
+        ax.set_ylabel('투자 기여도', fontsize=12)
+        ax2.set_ylabel('매수 가격', fontsize=12)
         
-        # Y축 포맷
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e6:.1f}백만원'))
+        # Y축 포맷 (3자리 단위 구분)
+        def format_value(x, _):
+            if abs(x) >= 1e8:  # 억 이상
+                return f'{x/1e8:.0f}억'
+            elif abs(x) >= 1e4:  # 만 이상
+                return f'{x/1e4:.0f}만'
+            elif abs(x) >= 1e3:  # 천 이상
+                return f'{x/1e3:.0f}천'
+            else:  # 천 미만
+                return f'{x:.0f}'
+        
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(format_value))
         
         # 범례
         lines1, labels1 = ax.get_legend_handles_labels()
@@ -323,7 +333,7 @@ class ChartGenerator:
         total_months = len(df)
         avg_contribution = df['contribution'].mean()
         
-        textstr = f'투자 성과 요약\n성공적인 타이밍: {positive_months}/{total_months}회\n평균 기여도: {avg_contribution:,.0f}원'
+        textstr = f'투자 성과 요약\n성공적인 타이밍: {positive_months}/{total_months}회\n평균 기여도: {avg_contribution:,.0f}'
         props = dict(boxstyle='round', facecolor='lightgray', alpha=0.8)
         ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
