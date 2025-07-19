@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # 복슬퀀트
 
 ## 프로젝트 개요
@@ -5,24 +9,129 @@
 - **목적**: 다양한 퀀트 투자 전략의 성과를 분석하고 비교하는 Python 기반 백테스팅 시스템
 - **주요 기능**: 일시투자 vs 적립식투자, 모멘텀 투자, 변동성 돌파 전략 분석 등
 
+## 핵심 아키텍처
+
+### 프로젝트 구조
+이 프로젝트는 **이중 아키텍처 방식**을 사용합니다:
+
+#### 현재 구조 (권장)
+```
+src/lump_sum_vs_dca/               # 독립 모듈 구조
+├── run_backtest.py                # 개별 백테스트 실행
+├── run_rolling_batch.py           # 롤링 백테스트 배치 실행
+├── config.py                      # 설정 관리
+├── lump_sum_vs_dca_backtester.py  # 전략 실행 엔진
+├── excel_exporter.py              # Excel 리포트 생성
+├── chart_generator.py             # 차트 시각화
+└── strategies/                    # 투자 전략 구현체
+```
+
+#### 공통 모듈
+```
+src/
+├── analyzer.py                    # 성과 분석 엔진 (CAGR, MDD, Sharpe 등)
+├── backtester.py                  # 베이스 백테스터
+└── config.py                      # 공통 설정
+```
+
+#### 데이터 및 결과
+```
+data/                              # 시장 데이터 (10개 지수 CSV)
+results/lump_sum_vs_dca/          # 분석 결과물
+├── excel/                        # Excel 분석 파일  
+├── charts/                       # 시각화 차트 (PNG)
+└── reports/                      # 분석 리포트
+```
+
+### 지원하는 시장 지수
+NASDAQ, SP500, KOSPI, KOSDAQ, DOW, FTSE, DAX, CAC, NIKKEI, HSI
+
 ## 명령어
+
+### 개별 백테스트 실행 (권장)
 ```bash
 # 의존성 설치
 pip install -r requirements.txt
 
-# 일시투자 vs 적립투자 백테스팅 실행 (테스트 코드 방식)
-cd backtests/lump_sum_vs_dca
-# 1. run_backtest.py에서 BACKTEST_CONFIG 변수 수정
-# 2. 실행
-python run_backtest.py
+# 1. 설정 변수 수정
+cd src/lump_sum_vs_dca
+# run_backtest.py에서 BACKTEST_CONFIG 변수 수정
 
-# 기존 방식 (중앙 집중식)
-python test_sample.py
+# 2. 개별 백테스트 실행
+python run_backtest.py
+```
+
+### 롤링 백테스트 실행
+```bash
+# 롤링 윈도우 분석 (여러 기간 일괄 테스트)
+cd src/lump_sum_vs_dca
+# run_rolling_batch.py에서 BATCH_CONFIG 변수 수정
+python run_rolling_batch.py
+```
+
+### 설정 예시
+```python
+# run_backtest.py 설정
+BACKTEST_CONFIG = {
+    'symbol': 'NASDAQ',                    # 투자 지수
+    'start_year': 2000,                    # 투자 시작 연도
+    'start_month': 1,                      # 투자 시작 월
+    'investment_period_years': 10,         # 투자 기간 (년)
+    'dca_months': 60,                      # 적립 분할 월수
+}
+
+# run_rolling_batch.py 설정
+BATCH_CONFIG = {
+    'symbol': 'NASDAQ',
+    'start_year': 1999,                    # 분석 시작 연도
+    'end_year': 2001,                      # 분석 종료 연도
+    'investment_period_years': 10,         # 각 테스트의 투자 기간
+    'dca_months': 60,                      # 적립 분할 월수
+}
 ```
 
 
+## 분석 파이프라인
+
+### 표준 분석 흐름
+```python
+1. 데이터 로딩 → CSV 파일에서 일봉 데이터 읽기
+2. 전략 실행 → 일시투자/적립투자 매수/보유 로직 실행  
+3. 성과 계산 → 지표 계산 (CAGR, MDD, Sharpe ratio, 변동성)
+4. 시각화 → 4가지 인사이트 차트 생성
+5. 출력 → 전문적인 Excel 리포트 생성
+```
+
+### 핵심 계산 방식 (일관성 보장)
+**중요**: 개별 백테스트와 롤링 백테스트 간 계산 일관성을 유지해야 합니다.
+
+```python
+# CAGR 계산 - 365.25일 기준 연환산
+days = len(daily_returns)
+years = days / 365.25
+cagr = (final_value / invested_amount) ** (1/years) - 1
+
+# 샤프 지수 - 2% 무위험수익률 적용
+daily_returns = total_return.diff().dropna()  # total_return 컬럼 사용
+mean_return = daily_returns.mean() * 365.25
+volatility = daily_returns.std() * np.sqrt(365.25)
+sharpe = (mean_return - 0.02) / volatility
+
+# 변동성 계산 - 365.25일 기준 연환산
+volatility = daily_returns.std() * np.sqrt(365.25)
+
+# MDD 계산 - drawdown 컬럼의 최솟값 사용
+mdd = abs(daily_returns['drawdown'].min())
+```
+
+### 출력 결과물
+- **Excel 리포트**: 4개 시트 (백테스트 설정, 매수 내역, 일 수익률 변화, 분석 요약)
+- **차트**: 4가지 인사이트 차트 (포트폴리오가치, 누적수익률비교, MDD비교, 투자타이밍효과)
+- **전문적 서식**: 색상 구분, 숫자 포맷팅, 테두리, 머리행 고정
+
 ## 개발 노트
-- **일시투자 vs 적립투자 백테스팅**: `backtests/lump_sum_vs_dca/` - ✅ 완성
+- **일시투자 vs 적립투자 백테스팅**: `src/lump_sum_vs_dca/` - ✅ 완성
+- **롤링 백테스트 시스템**: 여러 기간 일괄 분석 - ✅ 완성
 - **새로운 백테스팅 구조**: 각 백테스팅별 독립 모듈로 구성
 - **공통 모듈**: `src/` - 베이스 클래스 및 공통 유틸리티
 - **향후 백테스팅**: 모멘텀 전략, 변동성 돌파, 섹터 로테이션 등 계획됨
