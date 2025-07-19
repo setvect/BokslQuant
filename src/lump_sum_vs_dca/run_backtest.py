@@ -72,9 +72,19 @@ def run_backtest():
         exporter = ExcelExporter(config)
         excel_file = exporter.export_analysis(comparison_result, analyzer)
         
+        # 차트 생성
+        print("[5] 차트 생성 중...")
+        from chart_generator import ChartGenerator
+        chart_generator = ChartGenerator(config)
+        chart_files = chart_generator.generate_all_charts(comparison_result)
+        
         print("\n🎉 분석 완료!")
         print(f"📊 Excel 파일: {excel_file}")
         print(f"📋 백테스트 설정이 Excel 파일의 '백테스트 설정' 시트에 저장되었습니다.")
+        print(f"\n📈 생성된 차트:")
+        for chart_name, chart_path in chart_files.items():
+            print(f"  - {chart_name}: {chart_path}")
+        print(f"\n📁 차트 저장 경로: {config.charts_dir}")
         
         return 0
         
