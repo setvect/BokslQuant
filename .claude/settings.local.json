@@ -12,7 +12,8 @@
       "Bash(find:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(cp:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
