@@ -11,10 +11,11 @@ import os
 
 # 백테스팅 모듈과 공통 모듈 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, 'src')
-project_src_dir = os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'src')
-sys.path.insert(0, src_dir)
-sys.path.insert(0, project_src_dir)
+parent_src_dir = os.path.dirname(current_dir)  # /src 디렉토리
+strategies_dir = os.path.join(current_dir, 'strategies')  # strategies 디렉토리
+sys.path.insert(0, current_dir)  # 현재 디렉토리 (lump_sum_vs_dca)
+sys.path.insert(0, parent_src_dir)  # 부모 디렉토리 (src)
+sys.path.insert(0, strategies_dir)  # strategies 디렉토리
 
 # 백테스팅 설정 변수들 (여기를 수정하세요)
 BACKTEST_CONFIG = {
@@ -29,9 +30,9 @@ def run_backtest():
     """백테스팅 실행"""
     try:
         # 모듈 import
-        from src.config import LumpSumVsDcaConfig
-        from src.lump_sum_vs_dca_backtester import LumpSumVsDcaBacktester
-        from src.excel_exporter import ExcelExporter
+        from config import LumpSumVsDcaConfig
+        from lump_sum_vs_dca_backtester import LumpSumVsDcaBacktester
+        from excel_exporter import ExcelExporter
         from analyzer import PerformanceAnalyzer
         
         # 설정 생성

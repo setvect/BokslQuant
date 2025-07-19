@@ -14,19 +14,25 @@ class LumpSumVsDcaConfig:
     """일시투자 vs 적립투자 백테스팅 전용 설정 클래스"""
     
     def __init__(self):
-        # 백테스팅 루트 디렉토리
-        self.backtest_root = os.path.dirname(os.path.dirname(__file__))
+        # 현재 파일의 디렉토리 (/src/lump_sum_vs_dca)
+        current_dir = os.path.dirname(__file__)
         
-        # 프로젝트 루트 디렉토리  
-        self.project_root = os.path.dirname(os.path.dirname(self.backtest_root))
+        # src 디렉토리 (/src)
+        src_dir = os.path.dirname(current_dir)
+        
+        # 프로젝트 루트 디렉토리 (/mnt/d/intellij-project/boksl_quant)
+        self.project_root = os.path.dirname(src_dir)
+        
+        # 백테스팅 루트 디렉토리 (현재는 src/lump_sum_vs_dca)
+        self.backtest_root = current_dir
         
         # 디렉토리 경로 설정
         self.data_dir = os.path.join(self.project_root, 'data')
-        self.results_dir = os.path.join(self.backtest_root, 'results')
+        self.results_dir = os.path.join(self.project_root, 'results', 'lump_sum_vs_dca')
         self.excel_dir = os.path.join(self.results_dir, 'excel')
         self.charts_dir = os.path.join(self.results_dir, 'charts')
         self.reports_dir = os.path.join(self.results_dir, 'reports')
-        self.docs_dir = os.path.join(self.backtest_root, 'docs')
+        self.docs_dir = os.path.join(self.project_root, 'docs')
         
         # 고정 투자금 설정
         self.initial_capital = 10_000_000  # 1천만원

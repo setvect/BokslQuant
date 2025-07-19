@@ -14,7 +14,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 sys.path.append(os.path.join(project_root, 'src'))
 
 from backtester import Backtester as BaseBacktester
-from .strategy_factory import LumpSumVsDcaStrategyFactory
+from strategy_factory import LumpSumVsDcaStrategyFactory
 
 
 class LumpSumVsDcaBacktester(BaseBacktester):

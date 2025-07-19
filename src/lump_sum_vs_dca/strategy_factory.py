@@ -1,8 +1,8 @@
 """
 일시투자 vs 적립투자 전략 팩토리
 """
-from .strategies.lump_sum_strategy import LumpSumStrategy
-from .strategies.dca_strategy import DollarCostAverageStrategy
+from lump_sum_strategy import LumpSumStrategy
+from dca_strategy import DollarCostAverageStrategy
 
 
 class LumpSumVsDcaStrategyFactory:
