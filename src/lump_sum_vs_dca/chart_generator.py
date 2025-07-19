@@ -85,7 +85,7 @@ class ChartGenerator:
     
     def create_cumulative_returns_chart(self, comparison_result: Dict[str, Any]) -> str:
         """누적 수익률 비교 차트"""
-        fig, ax = plt.subplots(figsize=(14, 8))
+        fig, ax = plt.subplots(figsize=(15, 9))
         
         # 데이터 준비
         lump_sum_data = comparison_result['lump_sum']['daily_returns']
@@ -113,7 +113,7 @@ class ChartGenerator:
                     fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('날짜', fontsize=12)
         ax.set_ylabel('누적 수익률 (%)', fontsize=12)
-        ax.legend(fontsize=12, loc='upper left')
+        ax.legend(fontsize=12, loc='best', frameon=True, fancybox=True, shadow=True)
         ax.grid(True, alpha=0.3)
         
         # Y축 포맷 (% 표시)
@@ -123,10 +123,10 @@ class ChartGenerator:
         final_lump_sum = lump_sum_data['cumulative_return_pct'].iloc[-1]
         final_dca = dca_data['cumulative_return_pct'].iloc[-1]
         
-        # 텍스트 박스
+        # 텍스트 박스 (왼쪽 하단에 배치)
         textstr = f'최종 수익률\n일시투자: {final_lump_sum:.2f}%\n적립투자: {final_dca:.2f}%\n차이: {final_lump_sum - final_dca:.2f}%p'
         props = dict(boxstyle='round', facecolor='lightgray', alpha=0.8)
-        ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
+        ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
         
         plt.tight_layout()
@@ -141,7 +141,7 @@ class ChartGenerator:
     
     def create_portfolio_value_chart(self, comparison_result: Dict[str, Any]) -> str:
         """포트폴리오 가치 변화 차트"""
-        fig, ax = plt.subplots(figsize=(14, 8))
+        fig, ax = plt.subplots(figsize=(15, 9))
         
         # 데이터 준비
         lump_sum_data = comparison_result['lump_sum']['daily_returns']
@@ -168,7 +168,8 @@ class ChartGenerator:
                     fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('날짜', fontsize=12)
         ax.set_ylabel('포트폴리오 가치 (원)', fontsize=12)
-        ax.legend(fontsize=11, loc='upper left')
+        ax.legend(fontsize=10, loc='upper left', frameon=True, fancybox=True, shadow=True, 
+                 bbox_to_anchor=(0.02, 0.98))
         ax.grid(True, alpha=0.3)
         
         # Y축 포맷 (천만원 단위)
@@ -178,10 +179,10 @@ class ChartGenerator:
         final_lump_sum_value = lump_sum_data['current_value'].iloc[-1]
         final_dca_value = dca_data['current_value'].iloc[-1]
         
-        # 텍스트 박스
+        # 텍스트 박스 (왼쪽 하단에 배치)
         textstr = f'최종 포트폴리오 가치\n일시투자: {final_lump_sum_value:,.0f}원\n적립투자: {final_dca_value:,.0f}원\n차이: {final_lump_sum_value - final_dca_value:,.0f}원'
         props = dict(boxstyle='round', facecolor='lightgray', alpha=0.8)
-        ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
+        ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
         
         plt.tight_layout()
@@ -196,7 +197,7 @@ class ChartGenerator:
     
     def create_mdd_comparison_chart(self, comparison_result: Dict[str, Any]) -> str:
         """MDD 비교 차트"""
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+        fig, ax = plt.subplots(figsize=(15, 9))
         
         # 데이터 준비
         lump_sum_data = comparison_result['lump_sum']['daily_returns']
@@ -210,38 +211,29 @@ class ChartGenerator:
         lump_sum_data['drawdown_pct'] = lump_sum_data['drawdown'] * 100
         dca_data['drawdown_pct'] = dca_data['drawdown'] * 100
         
-        # 상단: Drawdown 시계열
-        ax1.fill_between(lump_sum_data['date'], lump_sum_data['drawdown_pct'], 0, 
-                        alpha=0.7, color='#1f77b4', label='일시투자')
-        ax1.fill_between(dca_data['date'], dca_data['drawdown_pct'], 0, 
-                        alpha=0.7, color='#ff7f0e', label='적립투자')
+        # Drawdown 시계열 차트
+        ax.plot(lump_sum_data['date'], lump_sum_data['drawdown_pct'], 
+                linewidth=2.5, color='#1f77b4', label='일시투자')
+        ax.plot(dca_data['date'], dca_data['drawdown_pct'], 
+                linewidth=2.5, color='#ff7f0e', label='적립투자')
         
-        ax1.set_title(f'{self.config.symbol} 손실폭(Drawdown) 비교', fontsize=14, fontweight='bold')
-        ax1.set_ylabel('손실폭 (%)', fontsize=12)
-        ax1.legend(fontsize=11)
-        ax1.grid(True, alpha=0.3)
-        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.1f}%'))
+        # 차트 설정
+        ax.set_title(f'{self.config.symbol} 손실폭(Drawdown) 비교\n({self.config.start_year}년 {self.config.start_month}월 ~ {self.config.investment_period_years}년간)', 
+                    fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('날짜', fontsize=12)
+        ax.set_ylabel('손실폭 (%)', fontsize=12)
+        ax.legend(fontsize=11, frameon=True, fancybox=True, shadow=True, loc='best')
+        ax.grid(True, alpha=0.3)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.1f}%'))
         
-        # 하단: MDD 막대 차트
-        strategies = ['일시투자', '적립투자']
-        mdd_values = [
-            lump_sum_data['drawdown_pct'].min(),
-            dca_data['drawdown_pct'].min()
-        ]
+        # MDD 정보 텍스트 박스
+        lump_sum_mdd = lump_sum_data['drawdown_pct'].min()
+        dca_mdd = dca_data['drawdown_pct'].min()
         
-        colors = ['#1f77b4', '#ff7f0e']
-        bars = ax2.bar(strategies, mdd_values, color=colors, alpha=0.8)
-        
-        # 값 표시
-        for bar, value in zip(bars, mdd_values):
-            height = bar.get_height()
-            ax2.text(bar.get_x() + bar.get_width()/2., height - 1,
-                    f'{value:.2f}%', ha='center', va='top', fontsize=11, fontweight='bold')
-        
-        ax2.set_title('최대 손실폭(MDD) 비교', fontsize=14, fontweight='bold')
-        ax2.set_ylabel('최대 손실폭 (%)', fontsize=12)
-        ax2.grid(True, alpha=0.3)
-        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.1f}%'))
+        info_text = f'최대 손실폭(MDD)\n일시투자: {lump_sum_mdd:.2f}%\n적립투자: {dca_mdd:.2f}%'
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        ax.text(0.02, 0.25, info_text, transform=ax.transAxes, fontsize=11,
+                verticalalignment='top', bbox=props)
         
         plt.tight_layout()
         
@@ -255,7 +247,7 @@ class ChartGenerator:
     
     def create_timing_effect_chart(self, comparison_result: Dict[str, Any]) -> str:
         """투자 타이밍 효과 차트"""
-        fig, ax = plt.subplots(figsize=(14, 8))
+        fig, ax = plt.subplots(figsize=(15, 9))
         
         # 적립투자 거래 데이터 분석
         dca_trades = comparison_result['dca']['trades']
@@ -321,7 +313,8 @@ class ChartGenerator:
         # 범례
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=11)
+        ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right', fontsize=10, 
+                 frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(0.98, 0.98))
         
         ax.grid(True, alpha=0.3)
         
@@ -332,7 +325,7 @@ class ChartGenerator:
         
         textstr = f'투자 성과 요약\n성공적인 타이밍: {positive_months}/{total_months}회\n평균 기여도: {avg_contribution:,.0f}원'
         props = dict(boxstyle='round', facecolor='lightgray', alpha=0.8)
-        ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
+        ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
                 verticalalignment='top', bbox=props)
         
         plt.tight_layout()
