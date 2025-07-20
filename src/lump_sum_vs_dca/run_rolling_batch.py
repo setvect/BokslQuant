@@ -8,11 +8,12 @@ import sys
 import pandas as pd
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.styles.numbers import FORMAT_NUMBER_COMMA_SEPARATED1, FORMAT_PERCENTAGE_00
+from openpyxl.styles.numbers import FORMAT_PERCENTAGE_00
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from typing import List, Dict, Any, Tuple
+from typing import Dict, Any
 from pathlib import Path
+from rolling_chart_generator import RollingChartGenerator
 
 # 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,12 +26,13 @@ sys.path.insert(0, strategies_dir)
 # 롤링 백테스트 설정 변수들 (여기를 수정하세요)
 BATCH_CONFIG = {
     'symbol': 'NASDAQ',                    # 투자 지수
-    'start_year': 1999,                    # 분석 시작 연도 (이 값을 변경하여 배치 조절)
+    'start_year': 1990,                    # 분석 시작 연도 (이 값을 변경하여 배치 조절)
     'start_month': 1,                      # 분석 시작 월 (이 값을 변경하여 배치 조절)
-    'end_year': 2001,                      # 분석 종료 연도 (이 값을 변경하여 배치 조절)
-    'end_month': 12,                       # 분석 종료 월 (이 값을 변경하여 배치 조절)
+    'end_year': 2015,                      # 분석 종료 연도 (이 값을 변경하여 배치 조절)
+    'end_month': 1,                       # 분석 종료 월 (이 값을 변경하여 배치 조절)
     'investment_period_years': 10,         # 각 테스트의 투자 기간 (년)
     'dca_months': 60,                      # 적립 분할 월수
+    'generate_charts': True,               # 차트 생성 여부 (True: 생성, False: 생성 안함)
 }
 
 
@@ -118,7 +120,7 @@ def run_single_backtest_silent(symbol: str, start_year: int, start_month: int,
             'value_difference': lump_sum_final_value - dca_final_value,
         }
         
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -133,6 +135,7 @@ def run_batch():
     END_MONTH = BATCH_CONFIG['end_month']
     INVESTMENT_PERIOD_YEARS = BATCH_CONFIG['investment_period_years']
     DCA_MONTHS = BATCH_CONFIG['dca_months']
+    GENERATE_CHARTS = BATCH_CONFIG.get('generate_charts', True)
     
     # 전체 테스트 기간 생성
     test_periods = []
@@ -198,6 +201,24 @@ def run_batch():
             dca_avg = df['dca_return'].mean()
             lump_win_rate = (df['return_difference'] > 0).mean()
             print(f"📈 요약: 일시투자 {lump_avg:.1%}, 적립투자 {dca_avg:.1%}, 일시투자 승률 {lump_win_rate:.1%}")
+        
+        # 인사이트 차트 생성 (설정에 따라)
+        if GENERATE_CHARTS:
+            print("\n📊 인사이트 차트 생성 중...")
+            chart_generator = RollingChartGenerator(
+                symbol=SYMBOL,
+                start_year=START_YEAR,
+                end_year=END_YEAR,
+                investment_period_years=INVESTMENT_PERIOD_YEARS,
+                dca_months=DCA_MONTHS
+            )
+            
+            chart_files = chart_generator.generate_all_charts(results)
+            print(f"📊 차트 생성 완료: {len(chart_files)}개 파일")
+            for chart_name, chart_path in chart_files.items():
+                print(f"  - {chart_name}: {Path(chart_path).name}")
+        else:
+            print("\n📊 차트 생성 건너뛰기 (설정: generate_charts=False)")
         
         return str(filepath)
     
