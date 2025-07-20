@@ -211,12 +211,14 @@ def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_
     # 컬럼 한글화 및 순서 정리
     df_styled = df.copy()
     
+    # 불필요한 컬럼 제거 (시작년도, 시작월은 시작기간과 중복)
+    columns_to_drop = ['start_year', 'start_month']
+    df_styled = df_styled.drop(columns=[col for col in columns_to_drop if col in df_styled.columns])
+    
     # 컬럼 순서 및 한글화
     column_mapping = {
         'period': '시작기간',
         'end_period': '종료기간',
-        'start_year': '시작년도',
-        'start_month': '시작월',
         'lump_sum_return': '일시투자_수익률',
         'lump_sum_cagr': '일시투자_CAGR',
         'lump_sum_mdd': '일시투자_MDD',
@@ -248,7 +250,7 @@ def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_
     ws['A1'] = title
     ws['A1'].font = Font(size=14, bold=True)
     ws['A1'].alignment = Alignment(horizontal='center')
-    ws.merge_cells('A1:S1')  # 제목 셀 병합
+    ws.merge_cells('A1:Q1')  # 제목 셀 병합 (컬럼 수 조정: 19개 -> 17개)
     
     # 데이터 추가 (3행부터)
     for r_idx, row in enumerate(df_styled.values, 3):
@@ -258,14 +260,14 @@ def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_
     # 헤더 추가 (2행)
     for c_idx, column in enumerate(df_styled.columns, 1):
         cell = ws.cell(row=2, column=c_idx, value=column)
-        cell.font = Font(bold=True, color="FFFFFF")
+        cell.font = Font(bold=True)  # 개별 백테스트와 동일하게 검정색으로 수정
         cell.alignment = Alignment(horizontal='center', vertical='center')
     
-    # 색상 정의
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")  # 헤더 파란색
-    common_fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")  # 공통 연한파랑
-    lump_sum_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # 일시투자 연한노랑
-    dca_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")  # 적립투자 연한초록
+    # 색상 정의 (개별 백테스트와 동일하게 수정)
+    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")  # 헤더 회색
+    common_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")  # 공통 연한회색
+    lump_sum_fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")  # 일시투자 연한파랑
+    dca_fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")  # 적립투자 연한초록
     difference_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")  # 차이 연한주황
     
     # 테두리 스타일
@@ -290,7 +292,7 @@ def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_
             
             # 컬럼별 배경색 및 정렬 적용
             col_name = df_styled.columns[col-1]
-            if col_name in ['시작기간', '종료기간', '시작년도', '시작월']:
+            if col_name in ['시작기간', '종료기간']:
                 cell.fill = common_fill
                 # 텍스트 데이터는 중앙 정렬
                 cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -307,20 +309,18 @@ def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_
                 # 수치 데이터는 오른쪽 정렬
                 cell.alignment = Alignment(horizontal='right', vertical='center')
                 
-            # 숫자 포맷 적용
+            # 숫자 포맷 적용 (개별 백테스트와 동일하게 수정)
             if '수익률' in col_name or 'CAGR' in col_name or 'MDD' in col_name or '변동성' in col_name:
                 cell.number_format = FORMAT_PERCENTAGE_00
-                # 데이터 값 조정 (백분율이 아닌 경우 소수로 변환)
-                if cell.value and isinstance(cell.value, (int, float)) and abs(cell.value) > 1:
-                    cell.value = cell.value / 100
+                # 데이터 값 조정 제거 (개별 백테스트와 동일하게 소수값 그대로 사용)
             elif '가치' in col_name or ('차이' in col_name and col_name == '가치차이'):
-                cell.number_format = FORMAT_NUMBER_COMMA_SEPARATED1
+                cell.number_format = "#,##0"  # 소수점 없는 금액 형식으로 수정
             elif '샤프지수' in col_name:
-                cell.number_format = '0.000'
+                cell.number_format = '0.00'  # 소수점 2자리로 수정
     
-    # 열 너비 자동 조정
+    # 열 너비 자동 조정 (불필요한 컬럼 제거)
     column_widths = {
-        '시작기간': 12, '종료기간': 12, '시작년도': 10, '시작월': 8,
+        '시작기간': 12, '종료기간': 12,
         '일시투자_수익률': 15, '일시투자_CAGR': 15, '일시투자_MDD': 15, 
         '일시투자_샤프지수': 15, '일시투자_변동성': 15, '일시투자_최종가치': 18,
         '적립투자_수익률': 15, '적립투자_CAGR': 15, '적립투자_MDD': 15,

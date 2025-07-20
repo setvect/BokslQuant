@@ -245,9 +245,10 @@ class ExcelExporter:
                 cell.fill = column_color
                 cell.border = thin_border
                 
-                # 첫 번째 행(헤더)은 볼드체 적용
+                # 첫 번째 행(헤더)은 볼드체 및 가운데 정렬 적용
                 if cell.row == 1:
                     cell.font = Font(bold=True)
+                    cell.alignment = Alignment(horizontal="center")
                 
                 # 길이 계산 (실제 표시될 텍스트 길이 고려)
                 try:

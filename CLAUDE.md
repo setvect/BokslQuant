@@ -153,8 +153,13 @@ Excel 파일을 생성할 때 반드시 다음 기준을 적용하세요:
 - 모든 숫자 데이터: 헤더를 제외한 모든 숫자 데이터는 오른쪽 정렬 필수
 ```
 
-#### 2. 머리행 고정
+#### 2. 표 머릿행 정렬 및 고정
 ```python
+# 표 머릿행 가운데 정렬 적용 (필수)
+if cell.row == 1:  # 헤더 행
+    cell.font = Font(bold=True)
+    cell.alignment = Alignment(horizontal="center")
+
 # 모든 데이터 시트에 머리행 고정 적용
 ws.freeze_panes = 'A2'
 ```

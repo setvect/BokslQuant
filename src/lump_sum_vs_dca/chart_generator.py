@@ -211,11 +211,16 @@ class ChartGenerator:
         lump_sum_data['drawdown_pct'] = lump_sum_data['drawdown'] * 100
         dca_data['drawdown_pct'] = dca_data['drawdown'] * 100
         
-        # Drawdown 시계열 차트
+        # Drawdown 시계열 차트 (채워진 라인 + 투명도)
+        ax.fill_between(lump_sum_data['date'], lump_sum_data['drawdown_pct'], 0,
+                       color='#1f77b4', alpha=0.4, label='일시투자')
         ax.plot(lump_sum_data['date'], lump_sum_data['drawdown_pct'], 
-                linewidth=2.5, color='#1f77b4', label='일시투자')
+                linewidth=2.5, color='#1f77b4', alpha=0.8)
+        
+        ax.fill_between(dca_data['date'], dca_data['drawdown_pct'], 0,
+                       color='#ff7f0e', alpha=0.4, label='적립투자')
         ax.plot(dca_data['date'], dca_data['drawdown_pct'], 
-                linewidth=2.5, color='#ff7f0e', label='적립투자')
+                linewidth=2.5, color='#ff7f0e', alpha=0.8)
         
         # 차트 설정
         ax.set_title(f'{self.config.symbol} 손실폭(Drawdown) 비교\n({self.config.start_year}년 {self.config.start_month}월 ~ {self.config.investment_period_years}년간)', 
