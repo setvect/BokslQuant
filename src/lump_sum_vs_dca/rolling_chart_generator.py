@@ -68,7 +68,7 @@ class RollingChartGenerator:
         plt.rcParams['savefig.bbox'] = 'tight'
     
     def generate_all_charts(self, results: List[Dict[str, Any]]) -> Dict[str, str]:
-        """핵심 인사이트 차트 2개 생성 (선별)"""
+        """핵심 인사이트 차트 3개 생성 (선별)"""
         chart_files = {}
         
         print("📊 핵심 인사이트 차트 생성 중...")
@@ -78,15 +78,82 @@ class RollingChartGenerator:
         df['date'] = pd.to_datetime(df['period'])
         df['win'] = (df['return_difference'] > 0).astype(int)
         
-        # 🎯 가장 인사이트가 있는 핵심 차트 2개만 생성
-        print("  [1/2] 성과 차이 히트맵 (시기별 패턴 분석)...")
+        # 🎯 가장 인사이트가 있는 핵심 차트 3개 생성
+        print("  [1/3] 수익률 시계열 비교 (투자 시점별 수익률 추이)...")
+        chart_files['return_timeline'] = self.create_return_timeline_chart(df)
+        
+        print("  [2/3] 성과 차이 히트맵 (시기별 패턴 분석)...")
         chart_files['performance_heatmap'] = self.create_performance_heatmap_chart(df)
         
-        print("  [2/2] 통계 요약 대시보드 (종합 분석)...")
+        print("  [3/3] 통계 요약 대시보드 (종합 분석)...")
         chart_files['summary_dashboard'] = self.create_summary_dashboard_chart(df)
         
         print("📊 핵심 인사이트 차트 생성 완료!")
         return chart_files
+    
+    def create_return_timeline_chart(self, df: pd.DataFrame) -> str:
+        """수익률 시계열 비교 차트"""
+        fig, ax = plt.subplots(figsize=(15, 9))
+        
+        # 시간순 정렬
+        df_sorted = df.sort_values('date')
+        
+        # 수익률을 퍼센트로 변환
+        lump_sum_returns = df_sorted['lump_sum_return'] * 100
+        dca_returns = df_sorted['dca_return'] * 100
+        
+        # 라인 차트 그리기
+        ax.plot(df_sorted['date'], lump_sum_returns, 
+               linewidth=3, color='#1f77b4', marker='o', markersize=4,
+               label=f'일시투자 (평균: {lump_sum_returns.mean():.1f}%)', alpha=0.8)
+        ax.plot(df_sorted['date'], dca_returns, 
+               linewidth=3, color='#ff7f0e', marker='s', markersize=4,
+               label=f'적립투자 (평균: {dca_returns.mean():.1f}%)', alpha=0.8)
+        
+        # 0% 기준선
+        ax.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=2, label='손익분기점 (0%)')
+        
+        # 우위 영역 표시
+        ax.fill_between(df_sorted['date'], lump_sum_returns, dca_returns,
+                       where=(lump_sum_returns > dca_returns),
+                       color='blue', alpha=0.1, interpolate=True, label='일시투자 우위 구간')
+        ax.fill_between(df_sorted['date'], lump_sum_returns, dca_returns,
+                       where=(lump_sum_returns <= dca_returns),
+                       color='orange', alpha=0.1, interpolate=True, label='적립투자 우위 구간')
+        
+        # 차트 설정
+        ax.set_title(f'{self.symbol} 투자 시점별 최종 수익률 비교\n({self.start_year}~{self.end_year}, {self.investment_period_years}년 투자)', 
+                    fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('투자 시작 시점', fontsize=12)
+        ax.set_ylabel('최종 수익률 (%)', fontsize=12)
+        ax.legend(fontsize=11, frameon=True, fancybox=True, shadow=True, loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        # X축 날짜 포맷
+        import matplotlib.dates as mdates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.xaxis.set_major_locator(mdates.YearLocator(2))  # 2년 간격
+        plt.xticks(rotation=45)
+        
+        # Y축 포맷 (% 표시)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.0f}%'))
+        
+        # 승률 정보 텍스트 박스
+        win_rate = (df['return_difference'] > 0).mean()
+        avg_diff = df['return_difference'].mean() * 100
+        
+        stats_text = f'전략 비교 요약\n일시투자 승률: {win_rate:.1%}\n평균 수익률 차이: {avg_diff:.1f}%p\n(일시투자 - 적립투자)'
+        ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+        
+        plt.tight_layout()
+        
+        filename = f'롤링_수익률시계열_{self.symbol}_{self.start_year}_{self.end_year}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filepath = self.chart_dir / filename
+        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(filepath)
     
     def create_win_rate_trend_chart(self, df: pd.DataFrame) -> str:
         """1. 승률 트렌드 차트"""
@@ -588,12 +655,12 @@ class RollingChartGenerator:
         ax2.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
         ax2.set_title('전체 승률 분포', fontweight='bold')
         
-        # 3. 수익률 차이 박스플롯
+        # 3. CAGR 분포 박스플롯
         ax3 = fig.add_subplot(gs[0, 2])
-        box_data = [df['lump_sum_return']*100, df['dca_return']*100, df['return_difference']*100]
-        ax3.boxplot(box_data, labels=['일시투자', '적립투자', '차이'])
-        ax3.set_title('수익률 분포 (박스플롯)', fontweight='bold')
-        ax3.set_ylabel('수익률 (%)')
+        box_data = [df['lump_sum_cagr']*100, df['dca_cagr']*100]
+        ax3.boxplot(box_data, labels=['일시투자', '적립투자'])
+        ax3.set_title('CAGR 분포 (박스플롯)', fontweight='bold')
+        ax3.set_ylabel('CAGR (%)')
         ax3.grid(True, alpha=0.3)
         
         # 4. 연도별 승률
@@ -612,15 +679,15 @@ class RollingChartGenerator:
             else:
                 bar.set_facecolor('red')
         ax4.axhline(y=50, color='blue', linestyle='--', linewidth=2, alpha=0.8)
-        ax4.set_title('연도별 일시투자 승률 추이', fontweight='bold')
+        ax4.set_title('연도별 일시투자 승률 추이', fontweight='bold', pad=15)
         ax4.set_xlabel('연도')
         ax4.set_ylabel('승률 (%)')
-        ax4.set_ylim(0, 100)
+        ax4.set_ylim(0, 110)  # 상단 여백 추가 (100 -> 110)
         ax4.grid(True, alpha=0.3)
         
         # 막대 위에 값 표시
         for bar, value in zip(bars, yearly_win_rate.values):
-            ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, 
+            ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 2, 
                     f'{value:.1f}%', ha='center', va='bottom', fontsize=9)
         
         # 5. 주요 통계 테이블
