@@ -25,11 +25,11 @@ sys.path.insert(0, strategies_dir)
 
 # 롤링 백테스트 설정 변수들 (여기를 수정하세요)
 BATCH_CONFIG = {
-    'symbol': 'KOSPI',                    # 투자 지수
-    'start_year': 1997,                    # 분석 시작 연도 (이 값을 변경하여 배치 조절)
+    'symbol': 'S&P500',                    # 투자 지수
+    'start_year': 1982,                    # 분석 시작 연도 (이 값을 변경하여 배치 조절)
     'start_month': 1,                      # 분석 시작 월 (이 값을 변경하여 배치 조절)
     'end_year': 2015,                      # 분석 종료 연도 (이 값을 변경하여 배치 조절)
-    'end_month': 1,                       # 분석 종료 월 (이 값을 변경하여 배치 조절)
+    'end_month': 6,                       # 분석 종료 월 (이 값을 변경하여 배치 조절)
     'investment_period_years': 10,         # 각 테스트의 투자 기간 (년)
     'dca_months': 60,                      # 적립 분할 월수
     'generate_charts': True,               # 차트 생성 여부 (True: 생성, False: 생성 안함)
