@@ -114,7 +114,6 @@ dmypy.json
 .DS_Store
 
 # Data files
-*.csv
 *.xlsx
 *.xls
 data/raw/
