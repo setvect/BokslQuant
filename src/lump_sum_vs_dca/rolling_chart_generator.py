@@ -23,7 +23,7 @@ class RollingChartGenerator:
     """롤링 백테스트 인사이트 차트 생성기"""
     
     def __init__(self, symbol: str, start_year: int, end_year: int, 
-                 investment_period_years: int, dca_months: int):
+                 investment_period_years: int, dca_months: int, chart_dir=None):
         self.symbol = symbol
         self.start_year = start_year
         self.end_year = end_year
@@ -31,10 +31,15 @@ class RollingChartGenerator:
         self.dca_months = dca_months
         self._setup_korean_fonts()
         
-        # 차트 저장 디렉토리 설정
-        current_dir = Path(__file__).parent
-        project_root = current_dir.parent.parent
-        self.chart_dir = project_root / "results" / "lump_sum_vs_dca" / "charts"
+        # 차트 저장 디렉토리 설정 (외부에서 지정 가능)
+        if chart_dir:
+            self.chart_dir = Path(chart_dir)
+        else:
+            # 기본 경로 (하위호환성)
+            current_dir = Path(__file__).parent
+            project_root = current_dir.parent.parent
+            self.chart_dir = project_root / "results" / "lump_sum_vs_dca" / "charts"
+        
         self.chart_dir.mkdir(parents=True, exist_ok=True)
     
     def _setup_korean_fonts(self):

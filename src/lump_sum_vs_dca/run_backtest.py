@@ -19,8 +19,8 @@ sys.path.insert(0, strategies_dir)  # strategies 디렉토리
 
 # 백테스팅 설정 변수들 (여기를 수정하세요)
 BACKTEST_CONFIG = {
-    'symbol': 'NASDAQ',                    # 투자 지수: NASDAQ, SP500, KOSPI 등
-    'start_year': 2000,                    # 투자 시작 연도
+    'symbol': 'KOSPI',                    # 투자 지수: NASDAQ, SP500, KOSPI 등
+    'start_year': 2010,                    # 투자 시작 연도
     'start_month': 1,                      # 투자 시작 월 (1-12)
     'investment_period_years': 10,         # 투자 기간 (년)
     'dca_months': 60,                      # 적립 분할 월수
@@ -45,6 +45,10 @@ def run_backtest():
             dca_months=BACKTEST_CONFIG['dca_months']
         )
         
+        # 개별 백테스트로 설정하고 세션 디렉토리 생성
+        config.set_backtest_type('detail')
+        session_dir = config.create_session_directory()
+        
         print("=== 일시투자 vs 적립투자 백테스팅 ===")
         print(f"지수: {config.symbol}")
         print(f"투자 시작: {config.start_year}년 {config.start_month}월")
@@ -52,7 +56,8 @@ def run_backtest():
         print(f"적립 분할: {config.dca_months}개월")
         print(f"총 투자금: {config.initial_capital:,}원")
         print(f"월 적립금: {config.get_dca_monthly_amount():,.0f}원")
-        print(f"결과 저장: {config.excel_dir}")
+        print(f"백테스트 타입: {config.backtest_type}")
+        print(f"결과 저장: {session_dir}")
         
         # 백테스팅 실행
         print("\n[1] 백테스팅 실행 중...")

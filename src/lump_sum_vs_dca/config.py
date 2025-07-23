@@ -28,10 +28,7 @@ class LumpSumVsDcaConfig:
         
         # 디렉토리 경로 설정
         self.data_dir = os.path.join(self.project_root, 'data')
-        self.results_dir = os.path.join(self.project_root, 'results', 'lump_sum_vs_dca')
-        self.excel_dir = os.path.join(self.results_dir, 'excel')
-        self.charts_dir = os.path.join(self.results_dir, 'charts')
-        self.reports_dir = os.path.join(self.results_dir, 'reports')
+        self.results_base_dir = os.path.join(self.project_root, 'results', 'lump_sum_vs_dca')
         self.docs_dir = os.path.join(self.project_root, 'docs')
         
         # 고정 투자금 설정
@@ -44,22 +41,57 @@ class LumpSumVsDcaConfig:
         self.investment_period_years = 10
         self.dca_months = 60
         
-        # 필요한 디렉토리 생성
-        self._create_directories()
+        # 백테스트 타입 (detail 또는 rolling)
+        self.backtest_type = "detail"  # 기본값은 개별 백테스트
+        
+        # 동적 디렉토리 경로 (백테스트 실행 시 설정됨)
+        self.result_session_dir = None
+        self.excel_dir = None  
+        self.charts_dir = None
+        
+        # 기본 디렉토리 생성
+        self._create_base_directories()
     
-    def _create_directories(self):
-        """필요한 디렉토리들 생성"""
+    def _create_base_directories(self):
+        """기본 디렉토리들 생성"""
         directories = [
-            self.results_dir,
-            self.excel_dir,
-            self.charts_dir,
-            self.reports_dir,
+            self.results_base_dir,
+            os.path.join(self.results_base_dir, 'detail'),
+            os.path.join(self.results_base_dir, 'rolling'),
             self.docs_dir
         ]
         
         for directory in directories:
             if not os.path.exists(directory):
                 os.makedirs(directory)
+    
+    def set_backtest_type(self, backtest_type: str):
+        """백테스트 타입 설정 (detail 또는 rolling)"""
+        if backtest_type not in ['detail', 'rolling']:
+            raise ValueError("backtest_type은 'detail' 또는 'rolling'이어야 합니다.")
+        self.backtest_type = backtest_type
+    
+    def create_session_directory(self):
+        """백테스트 세션별 디렉토리 생성"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_name = f"{self.symbol}_{self.start_year}_{self.start_month:02d}_{timestamp}"
+        
+        # 세션 디렉토리 경로 설정
+        self.result_session_dir = os.path.join(
+            self.results_base_dir, 
+            self.backtest_type, 
+            session_name
+        )
+        
+        # Excel과 차트 디렉토리는 세션 디렉토리 내부에
+        self.excel_dir = self.result_session_dir
+        self.charts_dir = self.result_session_dir
+        
+        # 디렉토리 생성
+        if not os.path.exists(self.result_session_dir):
+            os.makedirs(self.result_session_dir)
+        
+        return self.result_session_dir
     
     def get_symbol_file_path(self, symbol: str) -> str:
         """지수 데이터 파일 경로 반환"""
@@ -108,9 +140,10 @@ class LumpSumVsDcaConfig:
 적립 분할: {self.dca_months}개월
 총 투자금: {self.initial_capital:,}원
 월 적립금: {self.get_dca_monthly_amount():,.0f}원
+백테스트 타입: {self.backtest_type}
 
 결과 저장 경로:
-- Excel: {self.excel_dir}
-- 차트: {self.charts_dir}
-- 보고서: {self.reports_dir}
+- 세션 디렉토리: {self.result_session_dir or '미설정'}
+- Excel: {self.excel_dir or '미설정'}
+- 차트: {self.charts_dir or '미설정'}
 """

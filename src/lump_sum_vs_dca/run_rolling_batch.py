@@ -178,14 +178,17 @@ def run_batch():
     
     # 결과 저장
     if results:
-        # 결과 디렉토리 생성 (일시투자 vs 적립투자 결과 디렉토리)
+        # 롤링 백테스트 세션 디렉토리 생성
         current_dir = Path(__file__).parent
         project_root = current_dir.parent.parent  # src -> boksl_quant 
-        results_dir = project_root / "results" / "lump_sum_vs_dca"
+        
+        # 롤링 백테스트 세션별 디렉토리 생성
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_name = f"{SYMBOL}_{START_YEAR}_{START_MONTH:02d}_{timestamp}"
+        results_dir = project_root / "results" / "lump_sum_vs_dca" / "rolling" / session_name
         results_dir.mkdir(parents=True, exist_ok=True)
         
         # 파일명 생성
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"rolling_{SYMBOL}_{START_YEAR}{START_MONTH:02d}_{END_YEAR}{END_MONTH:02d}_{timestamp}.xlsx"
         filepath = results_dir / filename
         
@@ -210,7 +213,8 @@ def run_batch():
                 start_year=START_YEAR,
                 end_year=END_YEAR,
                 investment_period_years=INVESTMENT_PERIOD_YEARS,
-                dca_months=DCA_MONTHS
+                dca_months=DCA_MONTHS,
+                chart_dir=str(results_dir)  # 세션 디렉토리를 차트 디렉토리로 사용
             )
             
             chart_files = chart_generator.generate_all_charts(results)

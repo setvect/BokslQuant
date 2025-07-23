@@ -19,9 +19,12 @@ class ChartGenerator:
     
     def __init__(self, config):
         self.config = config
-        self.chart_dir = os.path.join(config.charts_dir)
+        self.chart_dir = config.charts_dir  # config에서 이미 설정된 경로 사용
         self._setup_korean_fonts()
-        self._create_chart_directory()
+        
+        # 차트 디렉토리가 없으면 생성
+        if self.chart_dir and not os.path.exists(self.chart_dir):
+            os.makedirs(self.chart_dir)
     
     def _setup_korean_fonts(self):
         """한글 폰트 설정"""
@@ -53,10 +56,6 @@ class ChartGenerator:
         plt.rcParams['savefig.dpi'] = 300
         plt.rcParams['savefig.bbox'] = 'tight'
     
-    def _create_chart_directory(self):
-        """차트 디렉토리 생성"""
-        if not os.path.exists(self.chart_dir):
-            os.makedirs(self.chart_dir)
     
     def generate_all_charts(self, comparison_result: Dict[str, Any]) -> Dict[str, str]:
         """모든 차트 생성"""
