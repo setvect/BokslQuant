@@ -114,16 +114,8 @@ dmypy.json
 .DS_Store
 
 # Data files
-*.xlsx
-*.xls
 data/raw/
 data/processed/
 results/
-
-# Plot files
-*.png
-*.jpg
-*.svg
-plots/ 
 
 temp
