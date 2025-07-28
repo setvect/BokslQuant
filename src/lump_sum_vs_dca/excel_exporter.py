@@ -355,11 +355,6 @@ class ExcelExporter:
             ["적립 분할 월수", f"{self.config.dca_months}개월"],
             ["총 투자금", f"{self.config.initial_capital:,}원"],
             ["월 적립금", f"{self.config.get_dca_monthly_amount():,.0f}원"],
-            ["", ""],  # 빈 행
-            ["파일 정보", ""],
-            ["데이터 파일", f"{self.config.symbol}_data.csv"],
-            ["결과 파일", self.config.get_excel_filename()],
-            ["생성 디렉토리", self.config.excel_dir],
         ]
         
         # 데이터 입력
@@ -374,7 +369,7 @@ class ExcelExporter:
                     ws.cell(row=row_idx, column=2).alignment = Alignment(horizontal="left")
                     
                     # 섹션 제목 스타일링
-                    if not value and key in ["투자 설정", "파일 정보"]:
+                    if not value and key in ["투자 설정"]:
                         ws.cell(row=row_idx, column=1).fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
         
         # 열 너비 조정
