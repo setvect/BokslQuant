@@ -153,7 +153,7 @@ class RollingChartGenerator:
         
         plt.tight_layout()
         
-        filename = f'롤링_수익률시계열_{self.symbol}_{self.start_year}_{self.end_year}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'롤링_수익률시계열_{self.symbol}_{self.start_year}_{self.end_year}.png'
         filepath = self.chart_dir / filename
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
@@ -338,7 +338,7 @@ class RollingChartGenerator:
         
         plt.tight_layout()
         
-        filename = f'롤링_성과히트맵_{self.symbol}_{self.start_year}_{self.end_year}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'롤링_성과히트맵_{self.symbol}_{self.start_year}_{self.end_year}.png'
         filepath = self.chart_dir / filename
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
@@ -732,7 +732,7 @@ class RollingChartGenerator:
         
         plt.tight_layout()
         
-        filename = f'롤링_종합대시보드_{self.symbol}_{self.start_year}_{self.end_year}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'롤링_종합대시보드_{self.symbol}_{self.start_year}_{self.end_year}.png'
         filepath = self.chart_dir / filename
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()

@@ -28,7 +28,7 @@ BATCH_CONFIG = {
     'symbol': 'S&P500',                    # 투자 지수
     'start_year': 1982,                    # 분석 시작 연도 (이 값을 변경하여 배치 조절)
     'start_month': 1,                      # 분석 시작 월 (이 값을 변경하여 배치 조절)
-    'end_year': 2015,                      # 분석 종료 연도 (이 값을 변경하여 배치 조절)
+    'end_year': 1987,                      # 분석 종료 연도 (이 값을 변경하여 배치 조절)
     'end_month': 6,                       # 분석 종료 월 (이 값을 변경하여 배치 조절)
     'investment_period_years': 10,         # 각 테스트의 투자 기간 (년)
     'dca_months': 60,                      # 적립 분할 월수
@@ -182,14 +182,14 @@ def run_batch():
         current_dir = Path(__file__).parent
         project_root = current_dir.parent.parent  # src -> boksl_quant 
         
-        # 롤링 백테스트 세션별 디렉토리 생성
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_name = f"{SYMBOL}_{START_YEAR}_{START_MONTH:02d}_{timestamp}"
+        # 롤링 백테스트 세션별 디렉토리 생성 (타임스탬프 제거)
+        base_session_name = f"{SYMBOL}_{START_YEAR}_{START_MONTH:02d}"
+        session_name = _get_unique_rolling_directory_name(project_root, base_session_name)
         results_dir = project_root / "results" / "lump_sum_vs_dca" / "rolling" / session_name
         results_dir.mkdir(parents=True, exist_ok=True)
         
-        # 파일명 생성
-        filename = f"rolling_{SYMBOL}_{START_YEAR}{START_MONTH:02d}_{END_YEAR}{END_MONTH:02d}_{timestamp}.xlsx"
+        # 파일명 생성 (타임스탬프 제거)
+        filename = f"rolling_{SYMBOL}_{START_YEAR}{START_MONTH:02d}_{END_YEAR}{END_MONTH:02d}.xlsx"
         filepath = results_dir / filename
         
         # DataFrame 생성 및 고급 엑셀 스타일 적용
@@ -227,6 +227,22 @@ def run_batch():
         return str(filepath)
     
     return None
+
+
+def _get_unique_rolling_directory_name(project_root: Path, base_name: str) -> str:
+    """중복 롤링 디렉토리명 처리 - 번호 추가"""
+    base_path = project_root / "results" / "lump_sum_vs_dca" / "rolling" / base_name
+    
+    if not base_path.exists():
+        return base_name
+    
+    counter = 1
+    while True:
+        new_name = f"{base_name}({counter})"
+        new_path = project_root / "results" / "lump_sum_vs_dca" / "rolling" / new_name
+        if not new_path.exists():
+            return new_name
+        counter += 1
 
 
 def _create_styled_excel(df: pd.DataFrame, filepath: Path, start_year: int, end_year: int, 

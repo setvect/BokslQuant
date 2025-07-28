@@ -72,9 +72,9 @@ class LumpSumVsDcaConfig:
         self.backtest_type = backtest_type
     
     def create_session_directory(self):
-        """백테스트 세션별 디렉토리 생성"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_name = f"{self.symbol}_{self.start_year}_{self.start_month:02d}_{timestamp}"
+        """백테스트 세션별 디렉토리 생성 (중복 시 번호 추가)"""
+        base_session_name = f"{self.symbol}_{self.start_year}_{self.start_month:02d}"
+        session_name = self._get_unique_directory_name(base_session_name)
         
         # 세션 디렉토리 경로 설정
         self.result_session_dir = os.path.join(
@@ -122,12 +122,27 @@ class LumpSumVsDcaConfig:
     
     def get_excel_filename(self) -> str:
         """Excel 결과 파일명 생성"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"lump_sum_vs_dca_{self.symbol}_{self.start_year}{self.start_month:02d}_{timestamp}.xlsx"
+        return f"lump_sum_vs_dca_{self.symbol}_{self.start_year}{self.start_month:02d}.xlsx"
     
     def get_excel_filepath(self) -> str:
         """Excel 결과 파일 전체 경로 반환"""
         return os.path.join(self.excel_dir, self.get_excel_filename())
+    
+    
+    def _get_unique_directory_name(self, base_name: str) -> str:
+        """중복 디렉토리명 처리 - 번호 추가"""
+        base_path = os.path.join(self.results_base_dir, self.backtest_type, base_name)
+        
+        if not os.path.exists(base_path):
+            return base_name
+        
+        counter = 1
+        while True:
+            new_name = f"{base_name}({counter})"
+            new_path = os.path.join(self.results_base_dir, self.backtest_type, new_name)
+            if not os.path.exists(new_path):
+                return new_name
+            counter += 1
     
     
     def __str__(self):

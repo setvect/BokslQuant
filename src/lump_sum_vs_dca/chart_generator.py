@@ -57,6 +57,7 @@ class ChartGenerator:
         plt.rcParams['savefig.bbox'] = 'tight'
     
     
+    
     def generate_all_charts(self, comparison_result: Dict[str, Any]) -> Dict[str, str]:
         """모든 차트 생성"""
         chart_files = {}
@@ -131,7 +132,7 @@ class ChartGenerator:
         plt.tight_layout()
         
         # 파일 저장
-        filename = f'누적수익률비교_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'누적수익률비교_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}.png'
         filepath = os.path.join(self.chart_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
@@ -187,7 +188,7 @@ class ChartGenerator:
         plt.tight_layout()
         
         # 파일 저장
-        filename = f'포트폴리오가치_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'포트폴리오가치_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}.png'
         filepath = os.path.join(self.chart_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
@@ -244,7 +245,7 @@ class ChartGenerator:
         plt.tight_layout()
         
         # 파일 저장
-        filename = f'MDD비교_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'MDD비교_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}.png'
         filepath = os.path.join(self.chart_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
@@ -347,7 +348,7 @@ class ChartGenerator:
         plt.tight_layout()
         
         # 파일 저장
-        filename = f'투자타이밍효과_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'투자타이밍효과_{self.config.symbol}_{self.config.start_year}{self.config.start_month:02d}.png'
         filepath = os.path.join(self.chart_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.close()
